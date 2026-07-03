@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum ProductStatus {
+  PENDING
+  IN_PROGRESS
+  FINISHED
+  OVERDUE
+}
+
+enum WarningStatus {
+  OPEN
+  HANDLED
+}
+
+enum FlowSource {
+  SCAN
+  MANUAL
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  username     String       @unique
+  passwordHash String       @map("password_hash")
+  displayName  String       @map("display_name")
+  role         UserRole     @default(ADMIN)
+  enabled      Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  flowRecords  FlowRecord[]
+  warnings     Warning[]
+
+  @@map("admin_users")
+}
+
+model Product {
+  id               Int           @id @default(autoincrement())
+  rowNo            Int?          @map("row_no")
+  productName      String        @map("product_name")
+  productModel     String        @map("product_model")
+  serialNo         String?       @map("serial_no")
+  quantity         Int           @default(1)
+  unit             String        @default("件")
+  remark           String?
+  currentProcessId Int?          @map("current_process_id")
+  currentEnteredAt DateTime?     @map("current_entered_at")
+  status           ProductStatus @default(PENDING)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  currentProcess   ProcessStep?  @relation(fields: [currentProcessId], references: [id])
+  flowRecords      FlowRecord[]
+  warnings         Warning[]
+
+  @@index([productModel])
+  @@index([serialNo])
+  @@map("products")
+}
+
+model ProcessStep {
+  id           Int          @id @default(autoincrement())
+  name         String       @unique
+  sortOrder    Int          @map("sort_no")
+  timeoutHours Int          @default(72) @map("timeout_hours")
+  enabled      Boolean      @default(true)
+  scanners     Scanner[]
+  products     Product[]
+  flowRecords  FlowRecord[]
+  warnings     Warning[]
+
+  @@map("process_steps")
+}
+
+model Scanner {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique @map("scanner_code")
+  name          String
+  ipAddress     String?      @map("ip_address")
+  processStepId Int          @map("process_step_id")
+  location      String?
+  enabled       Boolean      @default(true)
+  lastSeenAt    DateTime?    @map("last_seen_at")
+  processStep   ProcessStep  @relation(fields: [processStepId], references: [id])
+  flowRecords   FlowRecord[]
+
+  @@index([ipAddress])
+  @@map("scanners")
+}
+
+model FlowRecord {
+  id             Int         @id @default(autoincrement())
+  productId      Int         @map("product_id")
+  scanContent    String      @map("scan_content")
+  source         FlowSource  @default(SCAN)
+  note           String?
+  scannerId      Int?        @map("scanner_id")
+  processStepId  Int         @map("process_step_id")
+  operatorUserId Int?        @map("operator_user_id")
+  scannedAt      DateTime    @map("scanned_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  product        Product     @relation(fields: [productId], references: [id])
+  scanner        Scanner?    @relation(fields: [scannerId], references: [id])
+  processStep    ProcessStep @relation(fields: [processStepId], references: [id])
+  operator       User?       @relation(fields: [operatorUserId], references: [id])
+
+  @@index([scanContent])
+  @@index([scannedAt])
+  @@map("flow_records")
+}
+
+model Warning {
+  id             Int           @id @default(autoincrement())
+  productId      Int           @map("product_id")
+  processStepId  Int           @map("process_step_id")
+  operatorUserId Int?          @map("operator_user_id")
+  enteredAt      DateTime      @map("entered_at")
+  timeoutHours   Int           @map("timeout_hours")
+  status         WarningStatus @default(OPEN)
+  handledAt      DateTime?     @map("handled_at")
+  handledNote    String?       @map("handled_note")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  product        Product       @relation(fields: [productId], references: [id])
+  processStep    ProcessStep   @relation(fields: [processStepId], references: [id])
+  operator       User?         @relation(fields: [operatorUserId], references: [id])
+
+  @@index([status])
+  @@map("warnings")
+}
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}

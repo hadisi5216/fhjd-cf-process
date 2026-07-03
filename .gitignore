@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.log
+*.tsbuildinfo
+apps/*/dist/
+apps/*/node_modules/
+packages/*/dist/
+deploy/backups/*
+!deploy/backups/.gitkeep

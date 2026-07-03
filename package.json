@@ -1,0 +1,21 @@
+{
+  "name": "fhjd-cf-process",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @fhjd-cf/web",
+    "dev:api": "npm run start:dev -w @fhjd-cf/api",
+    "build": "npm run build -w @fhjd-cf/shared && npm run build -w @fhjd-cf/api && npm run build -w @fhjd-cf/web",
+    "build:web": "npm run build -w @fhjd-cf/web",
+    "build:api": "npm run build -w @fhjd-cf/api",
+    "lint": "npm run lint -w @fhjd-cf/web && npm run lint -w @fhjd-cf/api",
+    "prisma:generate": "npm run prisma:generate -w @fhjd-cf/api",
+    "prisma:migrate": "npm run prisma:migrate -w @fhjd-cf/api",
+    "docker:up": "docker compose -p fhjd-cf-process -f deploy/docker-compose.yml up -d --build",
+    "docker:down": "docker compose -p fhjd-cf-process -f deploy/docker-compose.yml down"
+  }
+}
