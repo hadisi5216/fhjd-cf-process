@@ -11,6 +11,7 @@ import { Badge, Button, Layout, Menu, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import fhjdLogo from '../assets/fhjd-logo-mark.png';
 import { clearToken } from '../services/api';
+import { enterFullscreen } from '../utils/fullscreen';
 
 const { Header, Content, Sider } = Layout;
 
@@ -34,6 +35,11 @@ export function AppLayout() {
     navigate('/login', { replace: true });
   }
 
+  async function openScreen() {
+    await enterFullscreen();
+    navigate('/screen');
+  }
+
   return (
     <Layout className="app-shell">
       <Sider width={236} theme="light" className="app-sider">
@@ -49,7 +55,13 @@ export function AppLayout() {
           mode="inline"
           selectedKeys={[selectedKey]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            if (key === '/screen') {
+              void openScreen();
+              return;
+            }
+            navigate(key);
+          }}
         />
       </Sider>
       <Layout>
@@ -59,7 +71,7 @@ export function AppLayout() {
           </Typography.Title>
           <div className="app-header-meta">
             <Badge status="processing" text="内网运行" />
-            <Button size="small" onClick={() => navigate('/screen')}>
+            <Button size="small" onClick={() => void openScreen()}>
               打开大屏
             </Button>
             <Typography.Text type="secondary">系统管理员</Typography.Text>

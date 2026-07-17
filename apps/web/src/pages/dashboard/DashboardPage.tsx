@@ -3,6 +3,7 @@ import { Alert, Card, Col, Empty, Row, Statistic, Table, Tag, Typography } from 
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDashboardSummary, getProducts } from '../../services/api';
+import { formatDateTime } from '../../utils/datetime';
 
 function statusText(value: string) {
   const map: Record<string, string> = {
@@ -19,11 +20,6 @@ function statusColor(value: string) {
   if (value === 'PENDING') return 'default';
   if (value === 'FINISHED') return 'green';
   return '#126e78';
-}
-
-function formatDate(value?: string) {
-  if (!value) return '-';
-  return value.replace('T', ' ').slice(0, 16);
 }
 
 export function DashboardPage() {
@@ -170,7 +166,7 @@ export function DashboardPage() {
                 {
                   title: '进入时间',
                   width: 150,
-                  render: (_, record) => formatDate(record.currentEnteredAt),
+                  render: (_, record) => formatDateTime(record.currentEnteredAt),
                 },
                 {
                   title: '状态',

@@ -7,6 +7,10 @@ export class ScanDto {
 
   @IsOptional()
   @IsString()
+  scannerName?: string;
+
+  @IsOptional()
+  @IsString()
   content?: string;
 
   @IsOptional()

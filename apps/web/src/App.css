@@ -784,6 +784,7 @@
 }
 
 .screen-command-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -820,6 +821,10 @@
   border-bottom: 1px solid rgba(218, 232, 244, 0.26);
 }
 
+.screen-command-table tr:first-child {
+  border-top: 1px solid rgba(218, 232, 244, 0.26);
+}
+
 .screen-command-table td {
   height: 33px;
   padding: 0;
@@ -850,6 +855,10 @@
 .screen-command-table tr.is-alert td {
   color: var(--screen-row-alert);
   font-weight: 400;
+}
+
+.screen-command-table tr.is-empty-row td {
+  color: transparent;
 }
 
 .screen-command-empty {

@@ -11,15 +11,11 @@ import {
   getProductFlows,
   updateProductProcess,
 } from '../../services/api';
+import { formatDateTime } from '../../utils/datetime';
 
 type ProcessForm = {
   processStepId: number;
 };
-
-function formatDate(value?: string) {
-  if (!value) return '-';
-  return value.replace('T', ' ').slice(0, 16);
-}
 
 function statusText(value?: string) {
   const map: Record<string, string> = {
@@ -38,12 +34,14 @@ function statusColor(value?: string) {
   return 'default';
 }
 
-function flowSourceText(value?: FlowRecord['source']) {
-  return value === 'MANUAL' ? '管理员调整' : '扫码进入';
+function flowSourceText(record: FlowRecord) {
+  if (record.source === 'MANUAL') return '管理员调整';
+  return record.isDuplicate ? '重复扫码' : '扫码进入';
 }
 
-function flowSourceColor(value?: FlowRecord['source']) {
-  return value === 'MANUAL' ? '#f79009' : '#126e78';
+function flowSourceColor(record: FlowRecord) {
+  if (record.source === 'MANUAL' || record.isDuplicate) return '#f79009';
+  return '#126e78';
 }
 
 export function ProductDetailPage() {
@@ -133,14 +131,14 @@ export function ProductDetailPage() {
       render: (value?: string) => value ?? '-',
     },
     {
-      title: '进入时间',
+      title: '记录时间',
       dataIndex: 'scannedAt',
-      render: (value?: string) => formatDate(value),
+      render: (value?: string) => formatDateTime(value),
     },
     {
       title: '来源',
       dataIndex: 'source',
-      render: (value?: FlowRecord['source']) => <Tag color={flowSourceColor(value)}>{flowSourceText(value)}</Tag>,
+      render: (_value, record) => <Tag color={flowSourceColor(record)}>{flowSourceText(record)}</Tag>,
     },
     {
       title: '扫码枪/操作',
@@ -186,9 +184,9 @@ export function ProductDetailPage() {
           <Descriptions.Item label="状态">
             <Tag color={statusColor(product.status)}>{statusText(product.status)}</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="当前工序进入时间">{formatDate(product.currentEnteredAt)}</Descriptions.Item>
-          <Descriptions.Item label="录入时间">{formatDate(product.createdAt)}</Descriptions.Item>
-          <Descriptions.Item label="更新时间">{formatDate(product.updatedAt)}</Descriptions.Item>
+          <Descriptions.Item label="当前工序进入时间">{formatDateTime(product.currentEnteredAt)}</Descriptions.Item>
+          <Descriptions.Item label="录入时间">{formatDateTime(product.createdAt)}</Descriptions.Item>
+          <Descriptions.Item label="更新时间">{formatDateTime(product.updatedAt)}</Descriptions.Item>
           <Descriptions.Item label="备注" span={3}>
             {product.remark || '-'}
           </Descriptions.Item>

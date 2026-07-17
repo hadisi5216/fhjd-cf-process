@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { createScanner, deleteScanner, getProcesses, getScanners, updateScanner, type Scanner, type ScannerInput } from '../../services/api';
+import { formatDateTimeWithSeconds } from '../../utils/datetime';
 
 export function ScannersPage() {
   const [open, setOpen] = useState(false);
@@ -13,6 +14,7 @@ export function ScannersPage() {
     queryKey: ['scanners'],
     queryFn: getScanners,
     retry: false,
+    refetchInterval: 5000,
   });
 
   const { data: processes = [] } = useQuery({
@@ -86,9 +88,14 @@ export function ScannersPage() {
             { title: '名称', dataIndex: 'name' },
             { title: '绑定工序', render: (_, record) => record.processStep?.name ?? '-', width: 110 },
             { title: 'IP 地址', dataIndex: 'ipAddress', width: 140 },
-            { title: '最近上报', dataIndex: 'lastSeenAt', width: 160, render: (value: string | undefined) => value ?? '-' },
             {
-              title: '状态',
+              title: '最近上报',
+              dataIndex: 'lastSeenAt',
+              width: 160,
+              render: (value: string | undefined) => formatDateTimeWithSeconds(value),
+            },
+            {
+              title: '启用状态',
               dataIndex: 'enabled',
               width: 100,
               render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag>,
@@ -116,18 +123,18 @@ export function ScannersPage() {
         confirmLoading={saveMutation.isPending}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" onFinish={(values) => saveMutation.mutate(values)}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => saveMutation.mutate(values)}>
           <Form.Item name="code" label="扫码枪编号" rules={[{ required: true, message: '请输入扫码枪编号' }]}>
-            <Input placeholder="例如：SCAN-BF-01" />
+            <Input autoComplete="off" placeholder="请输入扫码枪编号" />
           </Form.Item>
           <Form.Item name="name" label="扫码枪名称" rules={[{ required: true, message: '请输入扫码枪名称' }]}>
-            <Input placeholder="例如：包覆扫码枪" />
+            <Input autoComplete="off" placeholder="请输入扫码枪名称" />
           </Form.Item>
           <Form.Item name="processStepId" label="绑定工序" rules={[{ required: true, message: '请选择绑定工序' }]}>
             <Select placeholder="选择工序" options={processes.map((item) => ({ label: item.name, value: item.id }))} />
           </Form.Item>
           <Form.Item name="ipAddress" label="IP 地址">
-            <Input placeholder="例如：192.168.10.44" />
+            <Input autoComplete="off" placeholder="请输入 IP 地址" />
           </Form.Item>
           <Form.Item name="enabled" label="启用状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="停用" />

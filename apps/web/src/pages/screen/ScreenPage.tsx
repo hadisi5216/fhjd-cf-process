@@ -1,7 +1,9 @@
 import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getDashboardSummary, getPublicSettings } from '../../services/api';
+import { getApiDateTime } from '../../utils/datetime';
+import { enterFullscreen } from '../../utils/fullscreen';
 
 type ScreenProduct = {
   id: number;
@@ -10,6 +12,8 @@ type ScreenProduct = {
   status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
   currentEnteredAt?: string;
 };
+
+const TABLE_ROW_HEIGHT = 33;
 
 function pad(value: number) {
   return value.toString().padStart(2, '0');
@@ -25,7 +29,8 @@ function hoursAgo(hours: number) {
 
 function elapsedText(value?: string) {
   if (!value) return '-';
-  const elapsedMs = Date.now() - new Date(value).getTime();
+  const enteredAt = getApiDateTime(value);
+  const elapsedMs = enteredAt ? Date.now() - enteredAt : Number.NaN;
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '-';
 
   const totalMinutes = Math.floor(elapsedMs / 60_000);
@@ -40,13 +45,14 @@ function elapsedText(value?: string) {
 
 function isOverdue(value?: string) {
   if (!value) return false;
-  return Date.now() - new Date(value).getTime() >= 72 * 3_600_000;
+  const enteredAt = getApiDateTime(value);
+  return enteredAt ? Date.now() - enteredAt >= 72 * 3_600_000 : false;
 }
 
 function sortByElapsedDesc(products: ScreenProduct[]) {
   return [...products].sort((a, b) => {
-    const aTime = a.currentEnteredAt ? new Date(a.currentEnteredAt).getTime() : Number.POSITIVE_INFINITY;
-    const bTime = b.currentEnteredAt ? new Date(b.currentEnteredAt).getTime() : Number.POSITIVE_INFINITY;
+    const aTime = getApiDateTime(a.currentEnteredAt) ?? Number.POSITIVE_INFINITY;
+    const bTime = getApiDateTime(b.currentEnteredAt) ?? Number.POSITIVE_INFINITY;
     return aTime - bTime;
   });
 }
@@ -66,7 +72,7 @@ function makePreviewProducts(startId: number): ScreenProduct[] {
   ];
 
   return sortByElapsedDesc(
-    Array.from({ length: 36 }, (_, index) => {
+    Array.from({ length: 40 }, (_, index) => {
       const sequence = index + 1;
       const model = models[index % models.length];
       const elapsedHours = 3 + ((index * 7 + startId) % 86);
@@ -90,6 +96,8 @@ const previewProducts: Record<string, ScreenProduct[]> = {
 
 export function ScreenPage() {
   const [now, setNow] = useState(() => new Date());
+  const [visibleTableRows, setVisibleTableRows] = useState(1);
+  const firstProcessListRef = useRef<HTMLDivElement>(null);
   const { data } = useQuery({
     queryKey: ['screen-summary'],
     queryFn: getDashboardSummary,
@@ -107,6 +115,50 @@ export function ScreenPage() {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    function removeInteractionListeners() {
+      window.removeEventListener('pointerdown', enterOnInteraction);
+      window.removeEventListener('keydown', enterOnInteraction);
+    }
+
+    function enterOnInteraction() {
+      removeInteractionListeners();
+      void enterFullscreen();
+    }
+
+    void enterFullscreen().then((entered) => {
+      if (!entered && active) {
+        window.addEventListener('pointerdown', enterOnInteraction, { once: true });
+        window.addEventListener('keydown', enterOnInteraction, { once: true });
+      }
+    });
+
+    return () => {
+      active = false;
+      removeInteractionListeners();
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const list = firstProcessListRef.current;
+    if (!list) return;
+
+    const updateVisibleRows = () => {
+      setVisibleTableRows(Math.max(1, Math.floor(list.clientHeight / TABLE_ROW_HEIGHT) + 1));
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateVisibleRows);
+    observer?.observe(list);
+    window.addEventListener('resize', updateVisibleRows);
+    updateVisibleRows();
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateVisibleRows);
+    };
+  }, [data?.byProcess?.length]);
 
   const processStats = data?.byProcess ?? [];
   const usePreviewData = settings?.screenPreviewDataEnabled ?? true;
@@ -166,7 +218,7 @@ export function ScreenPage() {
 
       <section className="screen-command-board">
         {displayStats.length ? (
-          displayStats.map((process) => (
+          displayStats.map((process, processIndex) => (
             <article className={`screen-command-panel screen-process-tone-${process.name}`} key={process.id}>
               <header className="screen-command-panel-head">
                 <strong>{process.name}</strong>
@@ -180,24 +232,26 @@ export function ScreenPage() {
                 </div>
               </header>
 
-              <div className="screen-command-list">
-                {process.products.length ? (
-                  <table className="screen-command-table">
-                    <tbody>
-                      {process.products.map((product) => {
-                        const overdue = product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt);
-                        return (
-                          <tr className={overdue ? 'is-alert' : undefined} key={product.id}>
-                            <td>{product.productModel}</td>
-                            <td>{elapsedText(product.currentEnteredAt)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="screen-command-empty">暂无在制产品</div>
-                )}
+              <div className="screen-command-list" ref={processIndex === 0 ? firstProcessListRef : undefined}>
+                <table className="screen-command-table">
+                  <tbody>
+                    {process.products.map((product) => {
+                      const overdue = product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt);
+                      return (
+                        <tr className={overdue ? 'is-alert' : undefined} key={product.id}>
+                          <td>{product.productModel}</td>
+                          <td>{elapsedText(product.currentEnteredAt)}</td>
+                        </tr>
+                      );
+                    })}
+                    {Array.from({ length: Math.max(0, visibleTableRows - process.products.length) }, (_, index) => (
+                      <tr className="is-empty-row" key={`empty-${index}`} aria-hidden="true">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </article>
           ))

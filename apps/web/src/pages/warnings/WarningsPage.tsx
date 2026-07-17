@@ -1,11 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Space, Table, Tag, Typography, message } from 'antd';
 import { getWarnings, handleWarning, type Warning } from '../../services/api';
-
-function formatDate(value?: string) {
-  if (!value) return '-';
-  return value.replace('T', ' ').slice(0, 16);
-}
+import { formatDateTime } from '../../utils/datetime';
 
 export function WarningsPage() {
   const queryClient = useQueryClient();
@@ -46,7 +42,7 @@ export function WarningsPage() {
             { title: '产品型号', render: (_, record) => record.product.productModel },
             { title: '当前工序', render: (_, record) => record.processStep.name, width: 100 },
             { title: '预警说明', dataIndex: 'message', render: (_: string | undefined, record: Warning) => record.message ?? `${record.product.productName} 超时未流转` },
-            { title: '产生时间', dataIndex: 'createdAt', width: 180, render: formatDate },
+            { title: '产生时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },
             {
               title: '状态',
               dataIndex: 'status',

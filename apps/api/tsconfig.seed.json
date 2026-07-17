@@ -1,9 +1,14 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
     "resolvePackageJsonExports": false,
-    "isolatedModules": false
-  }
+    "isolatedModules": false,
+    "strictNullChecks": true
+  },
+  "include": ["prisma/seed.ts"]
 }

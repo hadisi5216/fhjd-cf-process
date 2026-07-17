@@ -149,6 +149,7 @@ export function ProductsPage() {
         <div className="table-tools product-filters">
           <Space wrap>
             <Input.Search
+              autoComplete="off"
               placeholder="搜索产品名称 / 型号 / 流水号"
               allowClear
               value={keyword}
@@ -236,26 +237,26 @@ export function ProductsPage() {
         confirmLoading={saveMutation.isPending}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" onFinish={(values) => saveMutation.mutate(values)}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => saveMutation.mutate(values)}>
           <Form.Item name="productName" label="产品名称" rules={[{ required: true, message: '请输入产品名称' }]}>
-            <Input placeholder="例如：12号舵舱体" />
+            <Input autoComplete="off" placeholder="请输入产品名称" />
           </Form.Item>
           <Form.Item name="productModel" label="产品型号" rules={[{ required: true, message: '请输入产品型号' }]}>
-            <Input placeholder="扫码内容当前按产品型号匹配" />
+            <Input autoComplete="off" placeholder="请输入产品型号" />
           </Form.Item>
           <Form.Item name="serialNo" label="流水号">
-            <Input placeholder="例如：2606003" />
+            <Input autoComplete="off" placeholder="请输入流水号" />
           </Form.Item>
           <Space style={{ width: '100%' }} align="start">
             <Form.Item name="quantity" label="数量" style={{ flex: 1 }}>
-              <InputNumber min={1} style={{ width: '100%' }} />
+              <InputNumber min={1} autoComplete="off" placeholder="请输入数量" style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="unit" label="单位" style={{ flex: 1 }}>
-              <Input placeholder="件" />
+              <Input autoComplete="off" placeholder="请输入单位" />
             </Form.Item>
           </Space>
           <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={3} />
+            <Input.TextArea rows={3} autoComplete="off" placeholder="请输入备注" />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,7 +1,7 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Typography, message } from 'antd';
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { login, setToken } from '../../services/api';
 
 type LoginForm = {
@@ -13,7 +13,18 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+  const [searchParams] = useSearchParams();
+  const locationState = location.state as { from?: string; authExpired?: boolean } | null;
+  const requestedFrom = locationState?.from ?? searchParams.get('from');
+  const from = requestedFrom?.startsWith('/') && !requestedFrom.startsWith('//') ? requestedFrom : '/dashboard';
+  const authExpired = locationState?.authExpired || searchParams.get('authExpired') === '1';
+
+  useEffect(() => {
+    if (authExpired) {
+      message.warning({ content: '登录已失效，请重新登录', key: 'auth-expired' });
+      navigate('/login', { replace: true, state: { from } });
+    }
+  }, [authExpired, from, navigate]);
 
   async function handleFinish(values: LoginForm) {
     setLoading(true);

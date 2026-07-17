@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const TOKEN_KEY = 'fhjd_cf_token';
+let authExpiredRedirectStarted = false;
 
 export const api = axios.create({
   baseURL: '/api',
@@ -14,16 +15,61 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const requestUrl = String(error.config?.url ?? '');
+    const isLoginRequest = requestUrl.includes('/auth/login');
+
+    if (error.response?.status === 401 && !isLoginRequest && getToken()) {
+      clearToken();
+      if (!authExpiredRedirectStarted) {
+        authExpiredRedirectStarted = true;
+        const params = new URLSearchParams({
+          authExpired: '1',
+          from: `${window.location.pathname}${window.location.search}`,
+        });
+        window.location.replace(`/login?${params.toString()}`);
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
+  authExpiredRedirectStarted = false;
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+export function hasValidToken() {
+  const token = getToken();
+  if (!token) return false;
+
+  try {
+    const payload = JSON.parse(decodeBase64Url(token.split('.')[1])) as { exp?: number };
+    const valid = typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
+    if (!valid) clearToken();
+    return valid;
+  } catch {
+    clearToken();
+    return false;
+  }
+}
+
+function decodeBase64Url(value?: string) {
+  if (!value) throw new Error('Invalid token');
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='));
+  return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
 }
 
 export type AdminUser = {
@@ -95,6 +141,7 @@ export type FlowRecord = {
   id: number;
   scanContent: string;
   source?: 'SCAN' | 'MANUAL';
+  isDuplicate: boolean;
   note?: string;
   scannedAt: string;
   createdAt: string;

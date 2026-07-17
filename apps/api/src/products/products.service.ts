@@ -37,12 +37,12 @@ export class ProductsService {
     return this.prisma.product.create({
       data: {
         rowNo: dto.rowNo,
-        productName: dto.productName,
-        productModel: dto.productModel,
-        serialNo: dto.serialNo,
+        productName: dto.productName.trim(),
+        productModel: dto.productModel.trim(),
+        serialNo: normalizeOptionalText(dto.serialNo),
         quantity: dto.quantity ?? 1,
-        unit: dto.unit ?? '件',
-        remark: dto.remark,
+        unit: normalizeOptionalText(dto.unit) ?? '件',
+        remark: normalizeOptionalText(dto.remark),
       },
       include: { currentProcess: true },
     });
@@ -63,7 +63,7 @@ export class ProductsService {
     await this.detail(id);
     return this.prisma.product.update({
       where: { id },
-      data: dto,
+      data: normalizeUpdateProductData(dto),
       include: { currentProcess: true },
     });
   }
@@ -121,4 +121,20 @@ export class ProductsService {
       orderBy: { scannedAt: 'asc' },
     });
   }
+}
+
+function normalizeOptionalText(value?: string) {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function normalizeUpdateProductData(dto: UpdateProductDto) {
+  return {
+    ...dto,
+    ...(dto.productName !== undefined ? { productName: dto.productName.trim() } : {}),
+    ...(dto.productModel !== undefined ? { productModel: dto.productModel.trim() } : {}),
+    ...(dto.serialNo !== undefined ? { serialNo: normalizeOptionalText(dto.serialNo) } : {}),
+    ...(dto.unit !== undefined ? { unit: normalizeOptionalText(dto.unit) } : {}),
+    ...(dto.remark !== undefined ? { remark: normalizeOptionalText(dto.remark) } : {}),
+  };
 }

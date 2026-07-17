@@ -56,10 +56,10 @@ async function main() {
   const processSteps = await prisma.processStep.findMany();
   const processStepMap = new Map(processSteps.map((step) => [step.name, step.id]));
   const scanners = [
-    { code: 'SCAN-DM-01', name: '打磨扫码枪', processName: '打磨', location: '打磨工序' },
-    { code: 'SCAN-ZP-01', name: '装配扫码枪', processName: '装配', location: '装配工序' },
-    { code: 'SCAN-PQ-01', name: '喷漆扫码枪', processName: '喷漆', location: '喷漆工序' },
-    { code: 'SCAN-BF-01', name: '包覆扫码枪', processName: '包覆', location: '包覆工序' },
+    { code: 'DM', legacyCode: 'SCAN-DM-01', name: '打磨扫码枪', processName: '打磨', location: '打磨工序' },
+    { code: 'ZP', legacyCode: 'SCAN-ZP-01', name: '装配扫码枪', processName: '装配', location: '装配工序' },
+    { code: 'PQ', legacyCode: 'SCAN-PQ-01', name: '喷漆扫码枪', processName: '喷漆', location: '喷漆工序' },
+    { code: 'BF', legacyCode: 'SCAN-BF-01', name: '包覆扫码枪', processName: '包覆', location: '包覆工序' },
   ];
 
   for (const scanner of scanners) {
@@ -68,15 +68,28 @@ async function main() {
       throw new Error(`Process step ${scanner.processName} is missing`);
     }
 
-    await prisma.scanner.upsert({
-      where: { code: scanner.code },
-      update: {
-        name: scanner.name,
-        processStepId,
-        location: scanner.location,
-        enabled: true,
+    const existingScanner = await prisma.scanner.findFirst({
+      where: {
+        OR: [{ code: scanner.code }, { code: scanner.legacyCode }, { name: scanner.name }],
       },
-      create: {
+    });
+
+    if (existingScanner) {
+      await prisma.scanner.update({
+        where: { id: existingScanner.id },
+        data: {
+          code: scanner.code,
+          name: scanner.name,
+          processStepId,
+          location: scanner.location,
+          enabled: true,
+        },
+      });
+      continue;
+    }
+
+    await prisma.scanner.create({
+      data: {
         code: scanner.code,
         name: scanner.name,
         processStepId,

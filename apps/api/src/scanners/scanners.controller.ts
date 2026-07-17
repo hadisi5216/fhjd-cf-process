@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Ip, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Ip, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateScannerDto } from './dto/create-scanner.dto';
 import { ScanDto } from './dto/scan.dto';
@@ -34,7 +34,44 @@ export class ScannersController {
   }
 
   @Post('scan')
-  scan(@Body() dto: ScanDto, @Ip() ip: string) {
-    return this.scannersService.recordScan(dto, ip);
+  scan(@Body() body: ScanDto | string | Record<string, unknown>, @Query() query: ScanQuery, @Ip() ip: string) {
+    return this.scannersService.recordScan({ ...normalizeScanBody(body), ...normalizeScanQuery(query) }, ip);
   }
+}
+
+type ScanQuery = Record<string, string | string[] | undefined>;
+
+function normalizeScanBody(body: ScanDto | string | Record<string, unknown>): ScanDto {
+  if (typeof body === 'string') {
+    return { content: body.trim() };
+  }
+
+  if (body && typeof body === 'object' && !('content' in body) && !('productModel' in body)) {
+    const entries = Object.entries(body);
+    if (entries.length === 1 && (entries[0][1] === '' || entries[0][1] === undefined)) {
+      return { content: entries[0][0].trim() };
+    }
+  }
+
+  if (!body || typeof body !== 'object') {
+    throw new BadRequestException('扫码内容不能为空');
+  }
+
+  return body as ScanDto;
+}
+
+function normalizeScanQuery(query: ScanQuery): Partial<ScanDto> {
+  const scannerAlias = firstQueryValue(query.scannerCode ?? query.code ?? query.name ?? query.scanner);
+  const content = firstQueryValue(query.content ?? query.productModel);
+
+  return {
+    ...(scannerAlias ? { scannerCode: scannerAlias, scannerName: scannerAlias } : {}),
+    ...(content ? { content } : {}),
+  };
+}
+
+function firstQueryValue(value?: string | string[]) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const normalized = raw?.trim();
+  return normalized || undefined;
 }

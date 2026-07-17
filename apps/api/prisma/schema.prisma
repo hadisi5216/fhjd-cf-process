@@ -100,6 +100,7 @@ model FlowRecord {
   productId      Int         @map("product_id")
   scanContent    String      @map("scan_content")
   source         FlowSource  @default(SCAN)
+  isDuplicate    Boolean     @default(false) @map("is_duplicate")
   note           String?
   scannerId      Int?        @map("scanner_id")
   processStepId  Int         @map("process_step_id")
@@ -112,6 +113,7 @@ model FlowRecord {
   operator       User?       @relation(fields: [operatorUserId], references: [id])
 
   @@index([scanContent])
+  @@index([productId, processStepId])
   @@index([scannedAt])
   @@map("flow_records")
 }

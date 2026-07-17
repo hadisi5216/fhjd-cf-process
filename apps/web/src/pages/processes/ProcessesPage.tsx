@@ -99,15 +99,15 @@ export function ProcessesPage() {
         confirmLoading={saveMutation.isPending}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" onFinish={(values) => saveMutation.mutate(values)}>
+        <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => saveMutation.mutate(values)}>
           <Form.Item name="name" label="工序名称" rules={[{ required: true, message: '请输入工序名称' }]}>
-            <Input placeholder="例如：包覆" />
+            <Input autoComplete="off" placeholder="请输入工序名称" />
           </Form.Item>
           <Form.Item name="sortOrder" label="流转顺序" rules={[{ required: true, message: '请输入顺序' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
+            <InputNumber min={1} autoComplete="off" placeholder="请输入流转顺序" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="timeoutHours" label="超时阈值（小时）" rules={[{ required: true, message: '请输入超时阈值' }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
+            <InputNumber min={0} autoComplete="off" placeholder="请输入超时阈值" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="enabled" label="启用状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="停用" />
