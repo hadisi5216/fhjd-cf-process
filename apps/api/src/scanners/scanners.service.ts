@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { CreateScannerDto } from './dto/create-scanner.dto';
 import { ScanDto } from './dto/scan.dto';
 import { UpdateScannerDto } from './dto/update-scanner.dto';
 
 @Injectable()
 export class ScannersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeService: RealtimeService,
+  ) {}
 
   list() {
     return this.prisma.scanner.findMany({
@@ -81,24 +85,21 @@ export class ScannersService {
       data: { lastSeenAt: scannedAt },
     });
 
-    const product = await this.findProductByScanContent(scanContent, scanner.processStepId);
+    const product = await this.findProductByScanContent(scanContent);
 
     if (!product) {
       throw new NotFoundException('未找到匹配扫码内容的产品');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Serialize scans for one product/process pair so simultaneous uploads have one first entry.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${product.id}, ${scanner.processStepId})::text`;
+      // Serialize every scan for one product so different process guns cannot race each other.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${product.id}, 0)::text`;
 
-      const firstEntry = await tx.flowRecord.findFirst({
-        where: {
-          productId: product.id,
-          processStepId: scanner.processStepId,
-        },
-        orderBy: [{ scannedAt: 'asc' }, { id: 'asc' }],
-      });
-      const isDuplicate = Boolean(firstEntry);
+      const currentProduct = await tx.product.findUnique({ where: { id: product.id } });
+      if (!currentProduct) {
+        throw new NotFoundException('产品不存在');
+      }
+      const isDuplicate = currentProduct.currentProcessId === scanner.processStepId;
 
       const flowRecord = await tx.flowRecord.create({
         data: {
@@ -112,7 +113,7 @@ export class ScannersService {
       });
 
       const updatedProduct = isDuplicate
-        ? product
+        ? currentProduct
         : await tx.product.update({
             where: { id: product.id },
             data: {
@@ -126,9 +127,17 @@ export class ScannersService {
         flowRecord,
         updatedProduct,
         isDuplicate,
-        enteredAt: firstEntry?.scannedAt ?? scannedAt,
+        enteredAt: isDuplicate ? (currentProduct.currentEnteredAt ?? scannedAt) : scannedAt,
       };
     });
+
+    if (!result.isDuplicate) {
+      this.realtimeService.notifyDashboardUpdate({
+        reason: 'SCAN',
+        productId: product.id,
+        processStepId: scanner.processStepId,
+      });
+    }
 
     return {
       success: true,
@@ -152,11 +161,10 @@ export class ScannersService {
     }
   }
 
-  private async findProductByScanContent(scanContent: string, processStepId: number) {
+  private async findProductByScanContent(scanContent: string) {
     const exactProduct = await this.prisma.product.findFirst({
       where: {
         productModel: scanContent,
-        status: { not: 'FINISHED' },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -166,28 +174,11 @@ export class ScannersService {
     }
 
     const candidates = await this.prisma.product.findMany({
-      where: {
-        status: { not: 'FINISHED' },
-      },
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
 
-    const normalizedActiveProduct = candidates.find((product) => product.productModel.trim() === scanContent);
-    if (normalizedActiveProduct) {
-      return normalizedActiveProduct;
-    }
-
-    const completedCandidates = await this.prisma.product.findMany({
-      where: {
-        status: 'FINISHED',
-        flowRecords: { some: { processStepId } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
-
-    return completedCandidates.find((product) => product.productModel.trim() === scanContent) ?? null;
+    return candidates.find((candidate) => candidate.productModel.trim() === scanContent) ?? null;
   }
 }
 

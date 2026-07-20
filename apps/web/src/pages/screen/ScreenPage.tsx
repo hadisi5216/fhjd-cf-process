@@ -1,5 +1,5 @@
 import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getDashboardSummary, getPublicSettings } from '../../services/api';
 import { getApiDateTime } from '../../utils/datetime';
@@ -95,6 +95,7 @@ const previewProducts: Record<string, ScreenProduct[]> = {
 };
 
 export function ScreenPage() {
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [visibleTableRows, setVisibleTableRows] = useState(1);
   const firstProcessListRef = useRef<HTMLDivElement>(null);
@@ -115,6 +116,19 @@ export function ScreenPage() {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/dashboard/events');
+    const refreshDashboard = () => {
+      void queryClient.invalidateQueries({ queryKey: ['screen-summary'] });
+    };
+
+    eventSource.addEventListener('dashboard-update', refreshDashboard);
+    return () => {
+      eventSource.removeEventListener('dashboard-update', refreshDashboard);
+      eventSource.close();
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     let active = true;

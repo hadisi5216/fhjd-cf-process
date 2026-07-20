@@ -9,6 +9,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProcessesModule } from './processes/processes.module';
 import { ProductsModule } from './products/products.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { ScannersModule } from './scanners/scanners.module';
 import { SettingsModule } from './settings/settings.module';
 import { WarningsModule } from './warnings/warnings.module';
@@ -18,6 +19,7 @@ import { WarningsModule } from './warnings/warnings.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    RealtimeModule,
     AuthModule,
     AdminsModule,
     ProductsModule,

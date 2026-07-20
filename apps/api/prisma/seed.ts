@@ -56,10 +56,11 @@ async function main() {
   const processSteps = await prisma.processStep.findMany();
   const processStepMap = new Map(processSteps.map((step) => [step.name, step.id]));
   const scanners = [
-    { code: 'DM', legacyCode: 'SCAN-DM-01', name: '打磨扫码枪', processName: '打磨', location: '打磨工序' },
-    { code: 'ZP', legacyCode: 'SCAN-ZP-01', name: '装配扫码枪', processName: '装配', location: '装配工序' },
-    { code: 'PQ', legacyCode: 'SCAN-PQ-01', name: '喷漆扫码枪', processName: '喷漆', location: '喷漆工序' },
-    { code: 'BF', legacyCode: 'SCAN-BF-01', name: '包覆扫码枪', processName: '包覆', location: '包覆工序' },
+    { code: 'DM', legacyCode: 'SCAN-DM-01', name: '打磨扫码枪', processName: '打磨', location: '打磨工序', ipAddress: '192.168.1.11' },
+    { code: 'ZP', legacyCode: 'SCAN-ZP-01', name: '装配扫码枪', processName: '装配', location: '装配工序', ipAddress: '192.168.1.12' },
+    { code: 'PQ', legacyCode: 'SCAN-PQ-01', name: '喷漆扫码枪', processName: '喷漆', location: '喷漆工序', ipAddress: '192.168.1.13' },
+    { code: 'BF', legacyCode: 'SCAN-BF-01', name: '包覆扫码枪', processName: '包覆', location: '包覆工序', ipAddress: '192.168.1.14' },
+    { code: 'WG', legacyCode: 'SCAN-WG-01', name: '完工扫码枪', processName: '完工', location: '完工工序', ipAddress: '192.168.1.15' },
   ];
 
   for (const scanner of scanners) {
@@ -82,6 +83,7 @@ async function main() {
           name: scanner.name,
           processStepId,
           location: scanner.location,
+          ipAddress: scanner.ipAddress,
           enabled: true,
         },
       });
@@ -94,6 +96,7 @@ async function main() {
         name: scanner.name,
         processStepId,
         location: scanner.location,
+        ipAddress: scanner.ipAddress,
         enabled: true,
       },
     });

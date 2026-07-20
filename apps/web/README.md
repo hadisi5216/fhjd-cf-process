@@ -1,32 +1,13 @@
-# React + TypeScript + Vite
+# Web 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+本目录是产品加工流程管理系统的 React 前端，包含管理员后台和无需登录的公开大屏 `/screen`。
 
-Currently, two official plugins are available:
+常用命令在仓库根目录执行：
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm run dev:web
+npm run build:web
+npm run lint -w @fhjd-cf/web
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+页面与数据刷新方案见[技术方案](../../docs/技术方案.md)，视觉与交互约束见[界面设计规范](../../docs/界面设计规范.md)。
