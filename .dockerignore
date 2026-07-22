@@ -2,6 +2,7 @@
 .gitignore
 .env
 node_modules
+storage
 apps/*/node_modules
 packages/*/node_modules
 apps/*/dist

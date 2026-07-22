@@ -14,6 +14,12 @@ type ScreenProduct = {
 };
 
 const TABLE_ROW_HEIGHT = 33;
+const ROW_STEP_INTERVAL_MS = 2000;
+const END_HOLD_STEPS = 1;
+const SCREEN_PROCESS_ORDER = ['打磨', '装配', '包覆', '涂装'];
+const SCREEN_PROCESS_NAMES: Record<string, string> = {
+  喷漆: '涂装',
+};
 
 function pad(value: number) {
   return value.toString().padStart(2, '0');
@@ -90,14 +96,15 @@ function makePreviewProducts(startId: number): ScreenProduct[] {
 const previewProducts: Record<string, ScreenProduct[]> = {
   打磨: makePreviewProducts(1000),
   装配: makePreviewProducts(2000),
-  喷漆: makePreviewProducts(3000),
   包覆: makePreviewProducts(4000),
+  涂装: makePreviewProducts(3000),
 };
 
 export function ScreenPage() {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const [visibleTableRows, setVisibleTableRows] = useState(1);
+  const [rowStep, setRowStep] = useState(0);
   const firstProcessListRef = useRef<HTMLDivElement>(null);
   const { data } = useQuery({
     queryKey: ['screen-summary'],
@@ -114,6 +121,11 @@ export function ScreenPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRowStep((current) => current + 1), ROW_STEP_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -178,14 +190,21 @@ export function ScreenPage() {
   const usePreviewData = settings?.screenPreviewDataEnabled ?? true;
   const refreshCountdown = 5 - (now.getSeconds() % 5);
   const refreshTick = refreshCountdown === 5;
-  const displayStats = processStats.map((process) => {
-    const products = (usePreviewData ? previewProducts[process.name] : undefined) ?? process.products ?? [];
-    const sortedProducts = sortByElapsedDesc(products);
-    const overdueCount = sortedProducts.filter(
-      (product) => product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt),
-    ).length;
-    return { ...process, count: sortedProducts.length, overdueCount, products: sortedProducts };
-  });
+  const displayStats = processStats
+    .map((process) => {
+      const displayName = SCREEN_PROCESS_NAMES[process.name] ?? process.name;
+      const products = (usePreviewData ? previewProducts[displayName] : undefined) ?? process.products ?? [];
+      const sortedProducts = sortByElapsedDesc(products);
+      const overdueCount = sortedProducts.filter(
+        (product) => product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt),
+      ).length;
+      return { ...process, name: displayName, count: sortedProducts.length, overdueCount, products: sortedProducts };
+    })
+    .sort((a, b) => {
+      const aOrder = SCREEN_PROCESS_ORDER.indexOf(a.name);
+      const bOrder = SCREEN_PROCESS_ORDER.indexOf(b.name);
+      return (aOrder < 0 ? Number.MAX_SAFE_INTEGER : aOrder) - (bOrder < 0 ? Number.MAX_SAFE_INTEGER : bOrder);
+    });
   const previewTotal = displayStats.reduce((sum, process) => sum + process.products.length, 0);
   const overdueTotal = displayStats
     .flatMap((item) => item.products)
@@ -232,43 +251,64 @@ export function ScreenPage() {
 
       <section className="screen-command-board">
         {displayStats.length ? (
-          displayStats.map((process, processIndex) => (
-            <article className={`screen-command-panel screen-process-tone-${process.name}`} key={process.id}>
-              <header className="screen-command-panel-head">
-                <strong>{process.name}</strong>
-                <div className="screen-command-panel-stats">
-                  <span>
-                    在制 <b>{process.count}</b>
-                  </span>
-                  <span className="is-alert">
-                    超时 <b>{process.overdueCount}</b>
-                  </span>
-                </div>
-              </header>
+          displayStats.map((process, processIndex) => {
+            const maxRowOffset = Math.max(0, process.products.length - visibleTableRows);
+            const cycleLength = maxRowOffset + 1 + END_HOLD_STEPS;
+            const cycleStep = maxRowOffset > 0 ? rowStep % cycleLength : 0;
+            const rowOffset = Math.min(cycleStep, maxRowOffset);
+            const isResetting = maxRowOffset > 0 && rowStep > 0 && cycleStep === 0;
 
-              <div className="screen-command-list" ref={processIndex === 0 ? firstProcessListRef : undefined}>
-                <table className="screen-command-table">
-                  <tbody>
+            return (
+              <article className={`screen-command-panel screen-process-tone-${process.name}`} key={process.id}>
+                <header className="screen-command-panel-head">
+                  <strong>{process.name}</strong>
+                  <div className="screen-command-panel-stats">
+                    <span>
+                      在制 <b>{process.count}</b>
+                    </span>
+                    <span className="is-alert">
+                      超时 <b>{process.overdueCount}</b>
+                    </span>
+                  </div>
+                </header>
+
+                <div
+                  className="screen-command-list"
+                  ref={processIndex === 0 ? firstProcessListRef : undefined}
+                  role="table"
+                  aria-label={`${process.name}在制产品列表`}
+                >
+                  <div className="screen-command-grid" aria-hidden="true">
+                    {Array.from({ length: visibleTableRows }, (_, index) => (
+                      <div className="screen-command-grid-row" key={index}>
+                        <span />
+                        <span />
+                      </div>
+                    ))}
+                  </div>
+                  <div
+                    className={`screen-command-data${isResetting ? ' is-resetting' : ''}`}
+                    style={{ transform: `translate3d(0, ${-rowOffset * TABLE_ROW_HEIGHT}px, 0)` }}
+                    role="rowgroup"
+                  >
                     {process.products.map((product) => {
                       const overdue = product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt);
                       return (
-                        <tr className={overdue ? 'is-alert' : undefined} key={product.id}>
-                          <td>{product.productModel}</td>
-                          <td>{elapsedText(product.currentEnteredAt)}</td>
-                        </tr>
+                        <div
+                          className={`screen-command-data-row${overdue ? ' is-alert' : ''}`}
+                          key={product.id}
+                          role="row"
+                        >
+                          <span role="cell">{product.productModel}</span>
+                          <span role="cell">{elapsedText(product.currentEnteredAt)}</span>
+                        </div>
                       );
                     })}
-                    {Array.from({ length: Math.max(0, visibleTableRows - process.products.length) }, (_, index) => (
-                      <tr className="is-empty-row" key={`empty-${index}`} aria-hidden="true">
-                        <td>&nbsp;</td>
-                        <td>&nbsp;</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          ))
+                  </div>
+                </div>
+              </article>
+            );
+          })
         ) : (
           <div className="screen-command-empty">暂无工序数据</div>
         )}

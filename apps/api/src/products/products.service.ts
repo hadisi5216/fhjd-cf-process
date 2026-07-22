@@ -3,34 +3,35 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChangeProductProcessDto } from './dto/change-product-process.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductDrawingsService } from './product-drawings.service';
+import { ProductExportService } from './product-export.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly productDrawingsService: ProductDrawingsService,
+    private readonly productExportService: ProductExportService,
+  ) {}
 
   list(keyword?: string, status?: string, processId?: string) {
-    const parsedProcessId = processId ? Number(processId) : undefined;
-
     return this.prisma.product.findMany({
-      where: {
-        ...(keyword
-          ? {
-              OR: [
-                { productName: { contains: keyword, mode: 'insensitive' as const } },
-                { productModel: { contains: keyword, mode: 'insensitive' as const } },
-                { serialNo: { contains: keyword, mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
-        ...(status ? { status: status as never } : {}),
-        ...(Number.isFinite(parsedProcessId) ? { currentProcessId: parsedProcessId } : {}),
-      },
+      where: buildProductFilter(keyword, status, processId),
       include: {
         currentProcess: true,
       },
       orderBy: [{ createdAt: 'desc' }],
       take: 200,
     });
+  }
+
+  async export(keyword?: string, status?: string, processId?: string) {
+    const products = await this.prisma.product.findMany({
+      where: buildProductFilter(keyword, status, processId),
+      include: { currentProcess: true },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+    return this.productExportService.createWorkbook(products);
   }
 
   create(dto: CreateProductDto) {
@@ -43,6 +44,7 @@ export class ProductsService {
         quantity: dto.quantity ?? 1,
         unit: normalizeOptionalText(dto.unit) ?? '件',
         remark: normalizeOptionalText(dto.remark),
+        manufacturingProcess: normalizeOptionalText(dto.manufacturingProcess),
       },
       include: { currentProcess: true },
     });
@@ -106,7 +108,11 @@ export class ProductsService {
 
   async remove(id: number) {
     await this.detail(id);
+    const storedNames = await this.productDrawingsService.getStoredNames(id);
     await this.prisma.product.delete({ where: { id } });
+    await this.productDrawingsService
+      .removeStoredFiles(storedNames)
+      .catch(() => undefined);
     return { success: true };
   }
 
@@ -128,13 +134,67 @@ function normalizeOptionalText(value?: string) {
   return normalized || undefined;
 }
 
+function buildProductFilter(
+  keyword?: string,
+  status?: string,
+  processId?: string,
+) {
+  const parsedProcessId = processId ? Number(processId) : undefined;
+  return {
+    ...(keyword
+      ? {
+          OR: [
+            {
+              productName: {
+                contains: keyword,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              productModel: {
+                contains: keyword,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              serialNo: { contains: keyword, mode: 'insensitive' as const },
+            },
+          ],
+        }
+      : {}),
+    ...(status ? { status: status as never } : {}),
+    ...(Number.isFinite(parsedProcessId)
+      ? { currentProcessId: parsedProcessId }
+      : {}),
+  };
+}
+
 function normalizeUpdateProductData(dto: UpdateProductDto) {
   return {
     ...dto,
-    ...(dto.productName !== undefined ? { productName: dto.productName.trim() } : {}),
-    ...(dto.productModel !== undefined ? { productModel: dto.productModel.trim() } : {}),
-    ...(dto.serialNo !== undefined ? { serialNo: normalizeOptionalText(dto.serialNo) } : {}),
-    ...(dto.unit !== undefined ? { unit: normalizeOptionalText(dto.unit) } : {}),
-    ...(dto.remark !== undefined ? { remark: normalizeOptionalText(dto.remark) } : {}),
+    ...(dto.productName !== undefined
+      ? { productName: dto.productName.trim() }
+      : {}),
+    ...(dto.productModel !== undefined
+      ? { productModel: dto.productModel.trim() }
+      : {}),
+    ...(dto.serialNo !== undefined
+      ? { serialNo: normalizeOptionalText(dto.serialNo) }
+      : {}),
+    ...(dto.unit !== undefined
+      ? { unit: normalizeOptionalText(dto.unit) }
+      : {}),
+    ...(dto.remark !== undefined
+      ? { remark: normalizeOptionalText(dto.remark) }
+      : {}),
+    ...(dto.manufacturingProcess !== undefined
+      ? {
+          manufacturingProcess: normalizeNullableText(dto.manufacturingProcess),
+        }
+      : {}),
   };
+}
+
+function normalizeNullableText(value: string) {
+  return value.trim() || null;
 }

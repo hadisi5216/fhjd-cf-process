@@ -229,6 +229,46 @@
   font-weight: 600;
 }
 
+.manufacturing-process-content {
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #344054;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.drawing-file-input {
+  display: none;
+}
+
+.drawing-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #344054;
+}
+
+.drawing-file-name .anticon {
+  color: #667085;
+  font-size: 17px;
+}
+
+.drawing-file-name .is-pdf {
+  color: #d92d20;
+}
+
+.drawing-upload-hint {
+  margin-top: 10px;
+  color: #667085;
+  font-size: 12px;
+}
+
 .flow-timeline-item {
   display: grid;
   gap: 4px;
@@ -715,15 +755,6 @@
   background: #2354be;
 }
 
-.screen-process-tone-喷漆 {
-  border-color: #128052;
-  background: transparent;
-}
-
-.screen-process-tone-喷漆 .screen-command-panel-head {
-  background: #128052;
-}
-
 .screen-process-tone-包覆 {
   border-color: #7b3ec8;
   background: transparent;
@@ -731,6 +762,15 @@
 
 .screen-process-tone-包覆 .screen-command-panel-head {
   background: #7b3ec8;
+}
+
+.screen-process-tone-涂装 {
+  border-color: #128052;
+  background: transparent;
+}
+
+.screen-process-tone-涂装 .screen-command-panel-head {
+  background: #128052;
 }
 
 .screen-command-panel-head {
@@ -785,80 +825,77 @@
 
 .screen-command-list {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 0;
-  background: transparent;
-  scrollbar-width: none;
-}
-
-.screen-command-list::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-
-.screen-command-list::-webkit-scrollbar-track {
+  overflow: hidden;
   background: transparent;
 }
 
-.screen-command-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: transparent;
+.screen-command-grid {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.screen-command-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+.screen-command-grid-row,
+.screen-command-data-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 82px;
+  height: 33px;
+  box-sizing: border-box;
 }
 
-.screen-command-table tr {
+.screen-command-grid-row {
   border-bottom: 1px solid rgba(218, 232, 244, 0.26);
 }
 
-.screen-command-table tr:first-child {
+.screen-command-grid-row:first-child {
   border-top: 1px solid rgba(218, 232, 244, 0.26);
 }
 
-.screen-command-table td {
-  height: 33px;
+.screen-command-grid-row span + span {
+  border-left: 1px solid rgba(218, 232, 244, 0.26);
+}
+
+.screen-command-data {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  transition: transform 280ms ease-out;
+  will-change: transform;
+}
+
+.screen-command-data.is-resetting {
+  transition: none;
+}
+
+.screen-command-data-row span {
+  display: grid;
+  place-items: center;
+  min-width: 0;
   padding: 0;
   color: #ffffff;
   font-size: 14px;
   font-weight: 300;
   line-height: 1;
   text-align: center;
-  vertical-align: middle;
   white-space: nowrap;
 }
 
-.screen-command-table td + td {
-  border-left: 1px solid rgba(218, 232, 244, 0.26);
-}
-
-.screen-command-table td:first-child {
+.screen-command-data-row span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.screen-command-table td:last-child {
-  width: 82px;
+.screen-command-data-row span:last-child {
   padding-left: 0;
   font-variant-numeric: tabular-nums;
 }
 
-.screen-command-table tr.is-alert td {
+.screen-command-data-row.is-alert span {
   color: var(--screen-row-alert);
   font-weight: 400;
-}
-
-.screen-command-table tr.is-empty-row td {
-  color: transparent;
 }
 
 .screen-command-empty {

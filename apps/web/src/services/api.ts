@@ -7,6 +7,14 @@ export const api = axios.create({
   baseURL: '/api',
 });
 
+export function getApiErrorMessage(error: unknown, fallback: string) {
+  if (!axios.isAxiosError(error)) return fallback;
+
+  const message = (error.response?.data as { message?: string | string[] } | undefined)?.message;
+  if (Array.isArray(message)) return message.join('；');
+  return message || fallback;
+}
+
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) {
@@ -127,6 +135,7 @@ export type Product = {
   quantity: number;
   unit: string;
   remark?: string;
+  manufacturingProcess?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
   currentEnteredAt?: string;
   createdAt?: string;
@@ -161,6 +170,15 @@ export type FlowRecord = {
   } | null;
 };
 
+export type ProductDrawing = {
+  id: number;
+  productId: number;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+};
+
 export type ProductInput = {
   rowNo?: number;
   productName: string;
@@ -169,6 +187,7 @@ export type ProductInput = {
   quantity?: number;
   unit?: string;
   remark?: string;
+  manufacturingProcess?: string;
 };
 
 export type ProcessStep = {
@@ -264,13 +283,54 @@ export async function getProducts(keyword?: string, status?: Product['status'], 
   return response.data;
 }
 
+export async function exportProducts(keyword?: string, status?: Product['status'], processId?: number) {
+  const response = await api.get<Blob>('/products/export', {
+    params: {
+      ...(keyword ? { keyword } : {}),
+      ...(status ? { status } : {}),
+      ...(processId ? { processId } : {}),
+    },
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 export async function getProduct(id: number) {
   const response = await api.get<Product>(`/products/${id}`);
   return response.data;
 }
 
+export async function updateProductManufacturingProcess(id: number, manufacturingProcess: string) {
+  const response = await api.put<Product>(`/products/${id}`, { manufacturingProcess });
+  return response.data;
+}
+
 export async function getProductFlows(id: number) {
   const response = await api.get<FlowRecord[]>(`/products/${id}/flows`);
+  return response.data;
+}
+
+export async function getProductDrawings(id: number) {
+  const response = await api.get<ProductDrawing[]>(`/products/${id}/drawings`);
+  return response.data;
+}
+
+export async function uploadProductDrawing(id: number, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post<ProductDrawing>(`/products/${id}/drawings`, formData);
+  return response.data;
+}
+
+export async function getProductDrawingFile(productId: number, drawingId: number) {
+  const response = await api.get<Blob>(`/products/${productId}/drawings/${drawingId}/file`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+export async function deleteProductDrawing(productId: number, drawingId: number) {
+  const response = await api.delete<{ success: boolean }>(`/products/${productId}/drawings/${drawingId}`);
   return response.data;
 }
 

@@ -1,4 +1,10 @@
-import { IsInt, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -34,4 +40,9 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(500)
   remark?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  manufacturingProcess?: string;
 }

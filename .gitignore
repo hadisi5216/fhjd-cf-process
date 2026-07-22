@@ -10,3 +10,4 @@ apps/*/node_modules/
 packages/*/dist/
 deploy/backups/*
 !deploy/backups/.gitkeep
+storage/

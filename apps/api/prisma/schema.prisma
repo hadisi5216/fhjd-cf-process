@@ -43,26 +43,42 @@ model User {
 }
 
 model Product {
-  id               Int           @id @default(autoincrement())
-  rowNo            Int?          @map("row_no")
-  productName      String        @map("product_name")
-  productModel     String        @map("product_model")
-  serialNo         String?       @map("serial_no")
-  quantity         Int           @default(1)
-  unit             String        @default("件")
-  remark           String?
-  currentProcessId Int?          @map("current_process_id")
-  currentEnteredAt DateTime?     @map("current_entered_at")
-  status           ProductStatus @default(PENDING)
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
-  currentProcess   ProcessStep?  @relation(fields: [currentProcessId], references: [id])
-  flowRecords      FlowRecord[]
-  warnings         Warning[]
+  id                   Int              @id @default(autoincrement())
+  rowNo                Int?             @map("row_no")
+  productName          String           @map("product_name")
+  productModel         String           @map("product_model")
+  serialNo             String?          @map("serial_no")
+  quantity             Int              @default(1)
+  unit                 String           @default("件")
+  remark               String?
+  manufacturingProcess String?          @map("manufacturing_process")
+  currentProcessId     Int?             @map("current_process_id")
+  currentEnteredAt     DateTime?        @map("current_entered_at")
+  status               ProductStatus    @default(PENDING)
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  currentProcess       ProcessStep?     @relation(fields: [currentProcessId], references: [id])
+  drawings             ProductDrawing[]
+  flowRecords          FlowRecord[]
+  warnings             Warning[]
 
   @@index([productModel])
   @@index([serialNo])
   @@map("products")
+}
+
+model ProductDrawing {
+  id           Int      @id @default(autoincrement())
+  productId    Int      @map("product_id")
+  originalName String   @map("original_name")
+  storedName   String   @unique @map("stored_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@map("product_drawings")
 }
 
 model ProcessStep {

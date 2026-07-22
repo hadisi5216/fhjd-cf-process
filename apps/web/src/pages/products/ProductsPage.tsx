@@ -1,3 +1,4 @@
+import { DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
@@ -5,6 +6,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   createProduct,
   deleteProduct,
+  exportProducts,
+  getApiErrorMessage,
   getProcesses,
   getProducts,
   updateProduct,
@@ -49,6 +52,7 @@ export function ProductsPage() {
   const [processId, setProcessId] = useState<number | undefined>();
   const [editing, setEditing] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [form] = Form.useForm<ProductInput>();
   const queryClient = useQueryClient();
 
@@ -131,6 +135,26 @@ export function ProductsPage() {
     setSearchParams(nextParams, { replace: true });
   }
 
+  async function exportFilteredProducts() {
+    setIsExporting(true);
+    try {
+      const file = await exportProducts(keyword, status, processId);
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `产品列表_${formatExportTimestamp()}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      message.success('产品列表已导出');
+    } catch (error) {
+      message.error(getApiErrorMessage(error, '产品导出失败，请稍后重试'));
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -140,9 +164,19 @@ export function ProductsPage() {
           </Typography.Title>
           <div className="page-kicker">手动维护产品档案，扫码枪按二维码内容识别产品并记录流转。</div>
         </div>
-        <Button type="primary" onClick={openCreate}>
-          新增产品
-        </Button>
+        <Space>
+          <Button
+            icon={<DownloadOutlined />}
+            loading={isExporting}
+            disabled={isFetching || data.length === 0}
+            onClick={exportFilteredProducts}
+          >
+            导出
+          </Button>
+          <Button type="primary" onClick={openCreate}>
+            新增产品
+          </Button>
+        </Space>
       </div>
 
       <Card className="module-card">
@@ -262,4 +296,10 @@ export function ProductsPage() {
       </Modal>
     </>
   );
+}
+
+function formatExportTimestamp() {
+  const now = new Date();
+  const part = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}${part(now.getMonth() + 1)}${part(now.getDate())}_${part(now.getHours())}${part(now.getMinutes())}${part(now.getSeconds())}`;
 }
