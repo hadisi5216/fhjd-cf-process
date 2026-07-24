@@ -135,7 +135,6 @@ export type Product = {
   quantity: number;
   unit: string;
   remark?: string;
-  manufacturingProcess?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
   currentEnteredAt?: string;
   createdAt?: string;
@@ -179,6 +178,27 @@ export type ProductDrawing = {
   createdAt: string;
 };
 
+export type ProductProcessAttachment = {
+  id: number;
+  productId: number;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+};
+
+export type ProductProcessAttachmentPreview =
+  | {
+      kind: 'word';
+      text: string;
+      truncated: boolean;
+    }
+  | {
+      kind: 'excel';
+      sheets: Array<{ name: string; rows: string[][] }>;
+      truncated: boolean;
+    };
+
 export type ProductInput = {
   rowNo?: number;
   productName: string;
@@ -187,7 +207,6 @@ export type ProductInput = {
   quantity?: number;
   unit?: string;
   remark?: string;
-  manufacturingProcess?: string;
 };
 
 export type ProcessStep = {
@@ -300,11 +319,6 @@ export async function getProduct(id: number) {
   return response.data;
 }
 
-export async function updateProductManufacturingProcess(id: number, manufacturingProcess: string) {
-  const response = await api.put<Product>(`/products/${id}`, { manufacturingProcess });
-  return response.data;
-}
-
 export async function getProductFlows(id: number) {
   const response = await api.get<FlowRecord[]>(`/products/${id}/flows`);
   return response.data;
@@ -331,6 +345,39 @@ export async function getProductDrawingFile(productId: number, drawingId: number
 
 export async function deleteProductDrawing(productId: number, drawingId: number) {
   const response = await api.delete<{ success: boolean }>(`/products/${productId}/drawings/${drawingId}`);
+  return response.data;
+}
+
+export async function getProductProcessAttachments(id: number) {
+  const response = await api.get<ProductProcessAttachment[]>(`/products/${id}/process-attachments`);
+  return response.data;
+}
+
+export async function uploadProductProcessAttachment(id: number, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post<ProductProcessAttachment>(`/products/${id}/process-attachments`, formData);
+  return response.data;
+}
+
+export async function getProductProcessAttachmentPreview(productId: number, attachmentId: number) {
+  const response = await api.get<ProductProcessAttachmentPreview>(
+    `/products/${productId}/process-attachments/${attachmentId}/preview`,
+  );
+  return response.data;
+}
+
+export async function getProductProcessAttachmentFile(productId: number, attachmentId: number) {
+  const response = await api.get<Blob>(`/products/${productId}/process-attachments/${attachmentId}/file`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+export async function deleteProductProcessAttachment(productId: number, attachmentId: number) {
+  const response = await api.delete<{ success: boolean }>(
+    `/products/${productId}/process-attachments/${attachmentId}`,
+  );
   return response.data;
 }
 

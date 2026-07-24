@@ -38,9 +38,4 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(500)
   remark?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(5000)
-  manufacturingProcess?: string;
 }

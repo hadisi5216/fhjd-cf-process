@@ -1,6 +1,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductDrawingsService } from './product-drawings.service';
 import { ProductExportService } from './product-export.service';
+import { ProductProcessAttachmentsService } from './product-process-attachments.service';
 import { ProductsService } from './products.service';
 
 describe('ProductsService', () => {
@@ -8,7 +9,6 @@ describe('ProductsService', () => {
     id: 7,
     productName: '测试产品',
     productModel: 'TEST-001',
-    manufacturingProcess: null,
   };
 
   let prisma: {
@@ -29,28 +29,20 @@ describe('ProductsService', () => {
     service = new ProductsService(
       prisma as unknown as PrismaService,
       {} as ProductDrawingsService,
+      {} as ProductProcessAttachmentsService,
       {} as ProductExportService,
     );
   });
 
-  it('updates the display-only manufacturing process as trimmed text', async () => {
+  it('normalizes editable product text fields', async () => {
     await service.update(7, {
-      manufacturingProcess: '  下料\n打磨\n检验  ',
+      productName: '  测试产品  ',
+      remark: '  重点件  ',
     });
 
     expect(prisma.product.update).toHaveBeenCalledWith({
       where: { id: 7 },
-      data: { manufacturingProcess: '下料\n打磨\n检验' },
-      include: { currentProcess: true },
-    });
-  });
-
-  it('clears the manufacturing process without changing actual process fields', async () => {
-    await service.update(7, { manufacturingProcess: '   ' });
-
-    expect(prisma.product.update).toHaveBeenCalledWith({
-      where: { id: 7 },
-      data: { manufacturingProcess: null },
+      data: { productName: '测试产品', remark: '重点件' },
       include: { currentProcess: true },
     });
   });

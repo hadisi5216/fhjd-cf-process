@@ -12,7 +12,10 @@ describe('ProductExportService', () => {
         quantity: 1,
         unit: '件',
         remark: '重点件',
-        manufacturingProcess: '下料\n打磨\n检验',
+        processAttachments: [
+          { originalName: '装配工艺.docx' },
+          { originalName: '检验记录.xlsx' },
+        ],
         status: 'IN_PROGRESS',
         currentEnteredAt: new Date('2026-07-22T00:00:00.000Z'),
         createdAt: new Date('2026-07-21T00:00:00.000Z'),
@@ -29,6 +32,6 @@ describe('ProductExportService', () => {
     expect(worksheet?.getCell('A2').value).toBe('12号舵舱体');
     expect(worksheet?.getCell('B2').value).toBe('J/CLL9-12A-101S1.1');
     expect(worksheet?.getCell('G2').value).toBe('加工中');
-    expect(worksheet?.getCell('H2').value).toBe('下料\n打磨\n检验');
+    expect(worksheet?.getCell('H2').value).toBe('装配工艺.docx\n检验记录.xlsx');
   });
 });

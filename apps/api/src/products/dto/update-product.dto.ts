@@ -40,9 +40,4 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(500)
   remark?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(5000)
-  manufacturingProcess?: string;
 }

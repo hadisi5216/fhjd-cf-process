@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ChangeProductProcessDto } from './dto/change-product-process.dto';
 import { ProductDrawingsService } from './product-drawings.service';
+import { ProductProcessAttachmentsService } from './product-process-attachments.service';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
@@ -30,6 +31,7 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly productDrawingsService: ProductDrawingsService,
+    private readonly productProcessAttachmentsService: ProductProcessAttachmentsService,
   ) {}
 
   @Get()
@@ -134,6 +136,64 @@ export class ProductsController {
     @Param('drawingId') drawingId: string,
   ) {
     return this.productDrawingsService.remove(Number(id), Number(drawingId));
+  }
+
+  @Get(':id/process-attachments')
+  processAttachments(@Param('id') id: string) {
+    return this.productProcessAttachmentsService.list(Number(id));
+  }
+
+  @Post(':id/process-attachments')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }),
+  )
+  uploadProcessAttachment(
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.productProcessAttachmentsService.create(Number(id), file);
+  }
+
+  @Get(':id/process-attachments/:attachmentId/preview')
+  previewProcessAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    return this.productProcessAttachmentsService.preview(
+      Number(id),
+      Number(attachmentId),
+    );
+  }
+
+  @Get(':id/process-attachments/:attachmentId/file')
+  @Header('Cache-Control', 'private, max-age=3600')
+  async processAttachmentFile(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.productProcessAttachmentsService.open(
+      Number(id),
+      Number(attachmentId),
+    );
+    response.setHeader('Content-Type', result.attachment.mimeType);
+    response.setHeader('Content-Length', result.attachment.size);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="process-attachment${extname(result.attachment.originalName)}"; filename*=UTF-8''${encodeURIComponent(result.attachment.originalName)}`,
+    );
+    return result.file;
+  }
+
+  @Delete(':id/process-attachments/:attachmentId')
+  removeProcessAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    return this.productProcessAttachmentsService.remove(
+      Number(id),
+      Number(attachmentId),
+    );
   }
 }
 

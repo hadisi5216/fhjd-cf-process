@@ -8,7 +8,7 @@ export type ProductExportRow = {
   quantity: number;
   unit: string;
   remark: string | null;
-  manufacturingProcess: string | null;
+  processAttachments: Array<{ originalName: string }>;
   status: string;
   currentEnteredAt: Date | null;
   createdAt: Date;
@@ -41,7 +41,7 @@ export class ProductExportService {
       { header: '单位', key: 'unit', width: 10 },
       { header: '当前工序', key: 'currentProcess', width: 14 },
       { header: '状态', key: 'status', width: 12 },
-      { header: '产品工艺', key: 'manufacturingProcess', width: 38 },
+      { header: '工艺流程附件', key: 'processAttachments', width: 38 },
       { header: '备注', key: 'remark', width: 24 },
       { header: '当前工序进入时间', key: 'currentEnteredAt', width: 21 },
       { header: '录入时间', key: 'createdAt', width: 21 },
@@ -57,7 +57,9 @@ export class ProductExportService {
         unit: product.unit,
         currentProcess: product.currentProcess?.name ?? '待扫码',
         status: STATUS_LABELS[product.status] ?? product.status,
-        manufacturingProcess: product.manufacturingProcess ?? '',
+        processAttachments: product.processAttachments
+          .map((attachment) => attachment.originalName)
+          .join('\n'),
         remark: product.remark ?? '',
         currentEnteredAt: formatDateTime(product.currentEnteredAt),
         createdAt: formatDateTime(product.createdAt),

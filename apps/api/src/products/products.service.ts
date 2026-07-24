@@ -5,12 +5,14 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductDrawingsService } from './product-drawings.service';
 import { ProductExportService } from './product-export.service';
+import { ProductProcessAttachmentsService } from './product-process-attachments.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly productDrawingsService: ProductDrawingsService,
+    private readonly productProcessAttachmentsService: ProductProcessAttachmentsService,
     private readonly productExportService: ProductExportService,
   ) {}
 
@@ -28,7 +30,13 @@ export class ProductsService {
   async export(keyword?: string, status?: string, processId?: string) {
     const products = await this.prisma.product.findMany({
       where: buildProductFilter(keyword, status, processId),
-      include: { currentProcess: true },
+      include: {
+        currentProcess: true,
+        processAttachments: {
+          select: { originalName: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
       orderBy: [{ createdAt: 'desc' }],
     });
     return this.productExportService.createWorkbook(products);
@@ -44,7 +52,6 @@ export class ProductsService {
         quantity: dto.quantity ?? 1,
         unit: normalizeOptionalText(dto.unit) ?? '件',
         remark: normalizeOptionalText(dto.remark),
-        manufacturingProcess: normalizeOptionalText(dto.manufacturingProcess),
       },
       include: { currentProcess: true },
     });
@@ -108,11 +115,20 @@ export class ProductsService {
 
   async remove(id: number) {
     await this.detail(id);
-    const storedNames = await this.productDrawingsService.getStoredNames(id);
+    const [drawingStoredNames, processAttachmentStoredNames] =
+      await Promise.all([
+        this.productDrawingsService.getStoredNames(id),
+        this.productProcessAttachmentsService.getStoredNames(id),
+      ]);
     await this.prisma.product.delete({ where: { id } });
-    await this.productDrawingsService
-      .removeStoredFiles(storedNames)
-      .catch(() => undefined);
+    await Promise.all([
+      this.productDrawingsService
+        .removeStoredFiles(drawingStoredNames)
+        .catch(() => undefined),
+      this.productProcessAttachmentsService
+        .removeStoredFiles(processAttachmentStoredNames)
+        .catch(() => undefined),
+    ]);
     return { success: true };
   }
 
@@ -187,14 +203,5 @@ function normalizeUpdateProductData(dto: UpdateProductDto) {
     ...(dto.remark !== undefined
       ? { remark: normalizeOptionalText(dto.remark) }
       : {}),
-    ...(dto.manufacturingProcess !== undefined
-      ? {
-          manufacturingProcess: normalizeNullableText(dto.manufacturingProcess),
-        }
-      : {}),
   };
-}
-
-function normalizeNullableText(value: string) {
-  return value.trim() || null;
 }

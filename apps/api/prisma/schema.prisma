@@ -59,6 +59,7 @@ model Product {
   updatedAt            DateTime         @updatedAt @map("updated_at")
   currentProcess       ProcessStep?     @relation(fields: [currentProcessId], references: [id])
   drawings             ProductDrawing[]
+  processAttachments   ProductProcessAttachment[]
   flowRecords          FlowRecord[]
   warnings             Warning[]
 
@@ -79,6 +80,20 @@ model ProductDrawing {
 
   @@index([productId, createdAt])
   @@map("product_drawings")
+}
+
+model ProductProcessAttachment {
+  id           Int      @id @default(autoincrement())
+  productId    Int      @map("product_id")
+  originalName String   @map("original_name")
+  storedName   String   @unique @map("stored_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@map("product_process_attachments")
 }
 
 model ProcessStep {

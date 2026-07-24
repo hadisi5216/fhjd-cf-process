@@ -229,19 +229,6 @@
   font-weight: 600;
 }
 
-.manufacturing-process-content {
-  min-height: 72px;
-  padding: 14px 16px;
-  border: 1px solid #e4e7ec;
-  border-radius: 4px;
-  background: #f8fafc;
-  color: #344054;
-  font-size: 14px;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .drawing-file-input {
   display: none;
 }
@@ -263,10 +250,86 @@
   color: #d92d20;
 }
 
+.drawing-file-name .is-word {
+  color: #2b579a;
+}
+
+.drawing-file-name .is-excel {
+  color: #217346;
+}
+
 .drawing-upload-hint {
   margin-top: 10px;
   color: #667085;
   font-size: 12px;
+}
+
+.process-attachment-preview-loading {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+}
+
+.process-attachment-preview-alert {
+  margin-bottom: 16px;
+}
+
+.process-word-preview {
+  max-height: 62vh;
+  overflow: auto;
+  padding: 24px 28px;
+  border: 1px solid #e4e7ec;
+  background: #ffffff;
+  color: #344054;
+  font-size: 14px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.process-excel-tabs .ant-tabs-content-holder {
+  min-height: 280px;
+}
+
+.process-excel-preview {
+  max-height: 62vh;
+  overflow: auto;
+  border: 1px solid #d0d5dd;
+  background: #ffffff;
+}
+
+.process-excel-preview table {
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #344054;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.process-excel-preview th,
+.process-excel-preview td {
+  height: 34px;
+  padding: 6px 10px;
+  border-right: 1px solid #e4e7ec;
+  border-bottom: 1px solid #e4e7ec;
+  text-align: left;
+  font-weight: 400;
+}
+
+.process-excel-preview th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 48px;
+  background: #f2f4f7;
+  color: #667085;
+  text-align: center;
+}
+
+.process-excel-preview td {
+  min-width: 120px;
+  background: #ffffff;
 }
 
 .flow-timeline-item {
