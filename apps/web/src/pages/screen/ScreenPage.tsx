@@ -13,7 +13,6 @@ type ScreenProduct = {
   currentEnteredAt?: string;
 };
 
-const TABLE_ROW_HEIGHT = 33;
 const ROW_STEP_INTERVAL_MS = 2000;
 const END_HOLD_STEPS = 1;
 const SCREEN_REFRESH_INTERVAL_MS = 5000;
@@ -21,6 +20,18 @@ const SCREEN_PROCESS_ORDER = ['打磨', '装配', '包覆', '涂装'];
 const SCREEN_PROCESS_NAMES: Record<string, string> = {
   喷漆: '涂装',
 };
+const SCREEN_LIST_FONT_SIZE_CLASSES = {
+  SMALL: 'screen-list-font-small',
+  STANDARD: 'screen-list-font-standard',
+  LARGE: 'screen-list-font-large',
+  EXTRA_LARGE: 'screen-list-font-extra-large',
+} as const;
+const SCREEN_LIST_ROW_HEIGHTS = {
+  SMALL: 30,
+  STANDARD: 33,
+  LARGE: 37,
+  EXTRA_LARGE: 42,
+} as const;
 
 const SERVER_CLOCK_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
@@ -132,6 +143,10 @@ export function ScreenPage() {
     refetchInterval: 5000,
     retry: false,
   });
+  const screenListFontSize =
+    settings?.screenListFontSize ?? 'STANDARD';
+  const tableRowHeight =
+    SCREEN_LIST_ROW_HEIGHTS[screenListFontSize];
   const serverTimeOffsetMs = data?.serverTimeOffsetMs ?? 0;
 
   useEffect(() => {
@@ -150,7 +165,10 @@ export function ScreenPage() {
   useEffect(() => {
     const eventSource = new EventSource('/api/dashboard/events');
     const refreshDashboard = () => {
-      void queryClient.invalidateQueries({ queryKey: ['screen-summary'] });
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['public-settings'] }),
+      ]);
     };
 
     eventSource.addEventListener('dashboard-update', refreshDashboard);
@@ -191,7 +209,12 @@ export function ScreenPage() {
     if (!list) return;
 
     const updateVisibleRows = () => {
-      setVisibleTableRows(Math.max(1, Math.floor(list.clientHeight / TABLE_ROW_HEIGHT) + 1));
+      setVisibleTableRows(
+        Math.max(
+          1,
+          Math.floor(list.clientHeight / tableRowHeight) + 1,
+        ),
+      );
     };
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateVisibleRows);
     observer?.observe(list);
@@ -202,7 +225,7 @@ export function ScreenPage() {
       observer?.disconnect();
       window.removeEventListener('resize', updateVisibleRows);
     };
-  }, [data?.byProcess?.length]);
+  }, [data?.byProcess?.length, tableRowHeight]);
 
   const processStats = data?.byProcess ?? [];
   const usePreviewData = settings?.screenPreviewDataEnabled ?? true;
@@ -252,7 +275,9 @@ export function ScreenPage() {
     ).length;
 
   return (
-    <main className="screen-command-page">
+    <main
+      className={`screen-command-page ${SCREEN_LIST_FONT_SIZE_CLASSES[screenListFontSize]}`}
+    >
       <header className="screen-command-top">
         <div className="screen-command-title-block">
           <div>
@@ -329,7 +354,9 @@ export function ScreenPage() {
                   </div>
                   <div
                     className={`screen-command-data${isResetting ? ' is-resetting' : ''}`}
-                    style={{ transform: `translate3d(0, ${-rowOffset * TABLE_ROW_HEIGHT}px, 0)` }}
+                    style={{
+                      transform: `translate3d(0, ${-rowOffset * tableRowHeight}px, 0)`,
+                    }}
                     role="rowgroup"
                   >
                     {process.products.map((product) => {

@@ -110,6 +110,15 @@ async function main() {
       value: 'true',
     },
   });
+
+  await prisma.systemSetting.upsert({
+    where: { key: 'screenListFontSize' },
+    update: {},
+    create: {
+      key: 'screenListFontSize',
+      value: 'STANDARD',
+    },
+  });
 }
 
 main()

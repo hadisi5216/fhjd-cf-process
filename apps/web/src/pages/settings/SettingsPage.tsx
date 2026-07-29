@@ -1,13 +1,28 @@
 import { LockOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Form, Input, Switch, Typography, message } from 'antd';
-import { changeAdminPassword, getSettings, updateSettings } from '../../services/api';
+import { Button, Card, Form, Input, Segmented, Switch, Typography, message } from 'antd';
+import {
+  changeAdminPassword,
+  getSettings,
+  updateSettings,
+  type ScreenListFontSize,
+} from '../../services/api';
 
 type PasswordForm = {
   oldPassword: string;
   newPassword: string;
   confirmPassword: string;
 };
+
+const screenListFontSizeOptions: Array<{
+  label: string;
+  value: ScreenListFontSize;
+}> = [
+  { label: '小号', value: 'SMALL' },
+  { label: '标准', value: 'STANDARD' },
+  { label: '大号', value: 'LARGE' },
+  { label: '特大', value: 'EXTRA_LARGE' },
+];
 
 export function SettingsPage() {
   const [form] = Form.useForm<PasswordForm>();
@@ -31,8 +46,10 @@ export function SettingsPage() {
 
   const settingsMutation = useMutation({
     mutationFn: updateSettings,
-    onSuccess: async () => {
+    onSuccess: async (savedSettings) => {
       message.success('大屏设置已保存');
+      queryClient.setQueryData(['settings'], savedSettings);
+      queryClient.setQueryData(['public-settings'], savedSettings);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['public-settings'] });
     },
@@ -43,6 +60,10 @@ export function SettingsPage() {
 
   function changeScreenPreviewDataEnabled(checked: boolean) {
     settingsMutation.mutate({ screenPreviewDataEnabled: checked });
+  }
+
+  function changeScreenListFontSize(value: ScreenListFontSize) {
+    settingsMutation.mutate({ screenListFontSize: value });
   }
 
   return (
@@ -119,24 +140,38 @@ export function SettingsPage() {
               </span>
               <div>
                 <Typography.Title level={3}>大屏看板</Typography.Title>
-                <Typography.Text type="secondary">控制大屏是否使用预览数据。</Typography.Text>
+                <Typography.Text type="secondary">配置大屏数据来源和产品列表字号。</Typography.Text>
               </div>
             </div>
 
-            <div className="settings-switch-row">
-              <div>
-                <Typography.Text strong>大屏预览数据</Typography.Text>
-                <div className="settings-help-text">
-                  开启后 `/screen` 使用模拟产品数据，关闭后显示真实产品流转数据。
+            <div className="settings-display-options">
+              <div className="settings-switch-row">
+                <div>
+                  <Typography.Text strong>大屏预览数据</Typography.Text>
+                  <div className="settings-help-text">
+                    开启后 `/screen` 使用模拟产品数据，关闭后显示真实产品流转数据。
+                  </div>
                 </div>
+                <Switch
+                  checked={settings?.screenPreviewDataEnabled ?? true}
+                  checkedChildren="开启"
+                  unCheckedChildren="关闭"
+                  loading={settingsLoading || settingsMutation.isPending}
+                  onChange={changeScreenPreviewDataEnabled}
+                />
               </div>
-              <Switch
-                checked={settings?.screenPreviewDataEnabled ?? true}
-                checkedChildren="开启"
-                unCheckedChildren="关闭"
-                loading={settingsLoading || settingsMutation.isPending}
-                onChange={changeScreenPreviewDataEnabled}
-              />
+              <div className="settings-switch-row settings-font-size-row">
+                <div>
+                  <Typography.Text strong>看板列表字号</Typography.Text>
+                  <div className="settings-help-text">调整产品型号和已用时的显示大小。</div>
+                </div>
+                <Segmented
+                  value={settings?.screenListFontSize ?? 'STANDARD'}
+                  options={screenListFontSizeOptions}
+                  disabled={settingsLoading || settingsMutation.isPending}
+                  onChange={changeScreenListFontSize}
+                />
+              </div>
             </div>
           </Card>
         </div>

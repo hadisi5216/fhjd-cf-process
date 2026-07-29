@@ -486,6 +486,9 @@
   --screen-line: rgba(72, 169, 255, 0.34);
   --screen-text: #f5faff;
   --screen-text-muted: #9fb8cf;
+  --screen-list-font-size: 14px;
+  --screen-time-column-width: 96px;
+  --screen-row-height: 33px;
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -500,6 +503,30 @@
   background: var(--screen-bg);
   background-size: auto;
   color: var(--screen-text);
+}
+
+.screen-command-page.screen-list-font-small {
+  --screen-list-font-size: 12px;
+  --screen-time-column-width: 90px;
+  --screen-row-height: 30px;
+}
+
+.screen-command-page.screen-list-font-standard {
+  --screen-list-font-size: 14px;
+  --screen-time-column-width: 96px;
+  --screen-row-height: 33px;
+}
+
+.screen-command-page.screen-list-font-large {
+  --screen-list-font-size: 16px;
+  --screen-time-column-width: 106px;
+  --screen-row-height: 37px;
+}
+
+.screen-command-page.screen-list-font-extra-large {
+  --screen-list-font-size: 18px;
+  --screen-time-column-width: 118px;
+  --screen-row-height: 42px;
 }
 
 .screen-command-top {
@@ -836,8 +863,10 @@
 .screen-command-grid-row,
 .screen-command-data-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 82px;
-  height: 33px;
+  grid-template-columns:
+    minmax(0, 1fr)
+    var(--screen-time-column-width);
+  height: var(--screen-row-height);
   box-sizing: border-box;
 }
 
@@ -871,7 +900,7 @@
   min-width: 0;
   padding: 0;
   color: #ffffff;
-  font-size: 14px;
+  font-size: var(--screen-list-font-size);
   font-weight: 300;
   line-height: 1;
   text-align: center;
@@ -959,6 +988,11 @@
   gap: 18px;
 }
 
+.settings-display-options {
+  display: grid;
+  gap: 12px;
+}
+
 .settings-card-head {
   display: flex;
   align-items: center;
@@ -995,6 +1029,10 @@
   border: 1px solid #edf1f6;
   border-radius: 8px;
   background: #f8fbfc;
+}
+
+.settings-font-size-row .ant-segmented {
+  flex: 0 0 auto;
 }
 
 .settings-help-text {

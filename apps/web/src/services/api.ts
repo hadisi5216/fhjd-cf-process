@@ -253,8 +253,15 @@ export type Warning = {
   };
 };
 
+export type ScreenListFontSize =
+  | 'SMALL'
+  | 'STANDARD'
+  | 'LARGE'
+  | 'EXTRA_LARGE';
+
 export type SystemSettings = {
   screenPreviewDataEnabled: boolean;
+  screenListFontSize: ScreenListFontSize;
 };
 
 function isDashboardSummary(value: unknown): value is DashboardSummary {
@@ -450,7 +457,7 @@ export async function getPublicSettings() {
   return response.data;
 }
 
-export async function updateSettings(data: SystemSettings) {
+export async function updateSettings(data: Partial<SystemSettings>) {
   const response = await api.put<SystemSettings>('/settings', data);
   return response.data;
 }
