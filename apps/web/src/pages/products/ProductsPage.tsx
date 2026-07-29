@@ -1,4 +1,4 @@
-import { DownloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
@@ -51,6 +51,8 @@ export function ProductsPage() {
   const [status, setStatus] = useState<Product['status'] | undefined>(() => readStatusParam(statusParam));
   const [processId, setProcessId] = useState<number | undefined>();
   const [editing, setEditing] = useState<Product | null>(null);
+  const [quickCreating, setQuickCreating] = useState(false);
+  const [quickCreateLoading, setQuickCreateLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [form] = Form.useForm<ProductInput>();
@@ -74,41 +76,102 @@ export function ProductsPage() {
 
   const saveMutation = useMutation({
     mutationFn: (values: ProductInput) => (editing ? updateProduct(editing.id, values) : createProduct(values)),
-    onSuccess: async () => {
-      message.success(editing ? '产品已更新' : '产品已新增');
+    onSuccess: async (savedProduct) => {
+      const wasEditing = Boolean(editing);
+      message.success(wasEditing ? '产品已更新' : '产品已新增');
+      if (wasEditing) {
+        queryClient.setQueryData(['product-detail', savedProduct.id], savedProduct);
+      }
       setModalOpen(false);
       setEditing(null);
+      setQuickCreating(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ['products'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['product-detail', savedProduct.id] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-products'] }),
+        queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+      ]);
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, editing ? '产品更新失败，请稍后重试' : '产品新增失败，请稍后重试'));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
-    onSuccess: async () => {
+    onSuccess: async (_result, deletedId) => {
       message.success('产品已删除');
-      await queryClient.invalidateQueries({ queryKey: ['products'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      queryClient.removeQueries({ queryKey: ['product-detail', deletedId] });
+      queryClient.removeQueries({ queryKey: ['product-flows', deletedId] });
+      queryClient.removeQueries({ queryKey: ['product-drawings', deletedId] });
+      queryClient.removeQueries({ queryKey: ['product-process-attachments', deletedId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['warnings'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-products'] }),
+        queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+      ]);
     },
   });
 
   function openCreate() {
     setEditing(null);
+    setQuickCreating(false);
     form.resetFields();
     form.setFieldsValue({ quantity: 1, unit: '件' });
     setModalOpen(true);
   }
 
+  async function openQuickCreate() {
+    setQuickCreateLoading(true);
+    try {
+      const latestProducts = await queryClient.fetchQuery({
+        queryKey: ['products', 'quick-create-source'],
+        queryFn: () => getProducts(),
+        staleTime: 0,
+      });
+      const latestProduct = latestProducts[0];
+
+      setEditing(null);
+      setQuickCreating(true);
+      form.resetFields();
+      form.setFieldsValue(
+        latestProduct
+          ? {
+              productName: latestProduct.productName,
+              productModel: latestProduct.productModel,
+              serialNo: latestProduct.serialNo ?? '',
+              quantity: latestProduct.quantity,
+              unit: latestProduct.unit,
+              remark: latestProduct.remark ?? '',
+            }
+          : { quantity: 1, unit: '件' },
+      );
+      setModalOpen(true);
+
+      if (!latestProduct) {
+        message.info('暂无历史产品，已使用默认值');
+      }
+    } catch (error) {
+      message.error(getApiErrorMessage(error, '读取最近录入产品失败'));
+    } finally {
+      setQuickCreateLoading(false);
+    }
+  }
+
   function openEdit(record: Product) {
     setEditing(record);
+    setQuickCreating(false);
     form.setFieldsValue({
       productName: record.productName,
       productModel: record.productModel,
-      serialNo: record.serialNo,
+      serialNo: record.serialNo ?? '',
       quantity: record.quantity,
       unit: record.unit,
-      remark: record.remark,
+      remark: record.remark ?? '',
     });
     setModalOpen(true);
   }
@@ -172,6 +235,9 @@ export function ProductsPage() {
             onClick={exportFilteredProducts}
           >
             导出
+          </Button>
+          <Button icon={<CopyOutlined />} loading={quickCreateLoading} onClick={openQuickCreate}>
+            快速新增
           </Button>
           <Button type="primary" onClick={openCreate}>
             新增产品
@@ -264,9 +330,12 @@ export function ProductsPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑产品' : '新增产品'}
+        title={editing ? '编辑产品' : quickCreating ? '快速新增产品' : '新增产品'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => {
+          setModalOpen(false);
+          setQuickCreating(false);
+        }}
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
         destroyOnHidden

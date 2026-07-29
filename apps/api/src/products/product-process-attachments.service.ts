@@ -5,24 +5,12 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { createReadStream } from 'fs';
-import { mkdir, readFile, stat, unlink, writeFile } from 'fs/promises';
+import { mkdir, stat, unlink, writeFile } from 'fs/promises';
 import { basename, extname, resolve } from 'path';
 import { randomUUID } from 'crypto';
-import ExcelJS from 'exceljs';
-import * as mammoth from 'mammoth';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024;
-const MAX_WORD_PREVIEW_CHARACTERS = 100_000;
-const MAX_EXCEL_PREVIEW_SHEETS = 10;
-const MAX_EXCEL_PREVIEW_ROWS = 300;
-const MAX_EXCEL_PREVIEW_COLUMNS = 30;
-const ALLOWED_EXTENSIONS = new Set(['.docx', '.xlsx']);
-const MIME_TYPES: Record<string, string> = {
-  '.docx':
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-};
 
 @Injectable()
 export class ProductProcessAttachmentsService {
@@ -50,11 +38,10 @@ export class ProductProcessAttachmentsService {
 
     const originalName = basename(normalizeOriginalName(file.originalname));
     const extension = extname(originalName).toLowerCase();
-    if (!ALLOWED_EXTENSIONS.has(extension)) {
-      throw new BadRequestException('仅支持 DOCX、XLSX 格式的工艺流程附件');
-    }
-
-    const storedName = `${randomUUID()}${extension}`;
+    const storageExtension = /^\.[a-z0-9]{1,16}$/i.test(extension)
+      ? extension
+      : '';
+    const storedName = `${randomUUID()}${storageExtension}`;
     const uploadDirectory = getUploadDirectory();
     await mkdir(uploadDirectory, { recursive: true });
     await writeFile(resolve(uploadDirectory, storedName), file.buffer);
@@ -65,7 +52,7 @@ export class ProductProcessAttachmentsService {
           productId,
           originalName,
           storedName,
-          mimeType: MIME_TYPES[extension],
+          mimeType: file.mimetype || 'application/octet-stream',
           size: file.size,
         },
       });
@@ -85,30 +72,6 @@ export class ProductProcessAttachmentsService {
       attachment,
       file: new StreamableFile(createReadStream(filePath)),
     };
-  }
-
-  async preview(productId: number, attachmentId: number) {
-    const attachment = await this.findAttachment(productId, attachmentId);
-    const filePath = resolve(getUploadDirectory(), attachment.storedName);
-    await ensureFileExists(filePath);
-    const file = await readFile(filePath);
-    const extension = extname(attachment.originalName).toLowerCase();
-
-    if (extension === '.docx') {
-      const result = await mammoth.extractRawText({ buffer: file });
-      const truncated = result.value.length > MAX_WORD_PREVIEW_CHARACTERS;
-      return {
-        kind: 'word' as const,
-        text: result.value.slice(0, MAX_WORD_PREVIEW_CHARACTERS),
-        truncated,
-      };
-    }
-
-    if (extension === '.xlsx') {
-      return this.previewWorkbook(file);
-    }
-
-    throw new BadRequestException('该文件不支持在线查看');
   }
 
   async remove(productId: number, attachmentId: number) {
@@ -139,42 +102,6 @@ export class ProductProcessAttachmentsService {
         ),
       ),
     );
-  }
-
-  private async previewWorkbook(file: Buffer) {
-    const workbook = new ExcelJS.Workbook();
-    const arrayBuffer = new ArrayBuffer(file.byteLength);
-    new Uint8Array(arrayBuffer).set(file);
-    await workbook.xlsx.load(arrayBuffer);
-    let truncated = workbook.worksheets.length > MAX_EXCEL_PREVIEW_SHEETS;
-    const sheets = workbook.worksheets
-      .slice(0, MAX_EXCEL_PREVIEW_SHEETS)
-      .map((worksheet) => {
-        const rowCount = Math.min(
-          worksheet.actualRowCount,
-          MAX_EXCEL_PREVIEW_ROWS,
-        );
-        const columnCount = Math.min(
-          worksheet.actualColumnCount,
-          MAX_EXCEL_PREVIEW_COLUMNS,
-        );
-        truncated ||=
-          worksheet.actualRowCount > rowCount ||
-          worksheet.actualColumnCount > columnCount;
-
-        return {
-          name: worksheet.name,
-          rows: Array.from({ length: rowCount }, (_, rowIndex) =>
-            Array.from({ length: columnCount }, (_, columnIndex) =>
-              formatCellValue(
-                worksheet.getRow(rowIndex + 1).getCell(columnIndex + 1).value,
-              ),
-            ),
-          ),
-        };
-      });
-
-    return { kind: 'excel' as const, sheets, truncated };
   }
 
   private async findAttachment(productId: number, attachmentId: number) {
@@ -225,42 +152,29 @@ function toAttachmentResponse<
 }
 
 function normalizeOriginalName(originalName: string) {
-  const decoded = Buffer.from(originalName, 'latin1').toString('utf8');
-  return decoded.includes('\uFFFD') ? originalName : decoded;
+  let normalized = originalName.normalize('NFC');
+
+  // Multer may expose UTF-8 header bytes as Latin-1 text. Repair both new
+  // uploads and historical names that were accidentally encoded twice.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const mojibakeCount = countLatin1Characters(normalized);
+    if (mojibakeCount === 0) break;
+
+    const decoded = Buffer.from(normalized, 'latin1')
+      .toString('utf8')
+      .normalize('NFC');
+    if (
+      decoded.includes('\uFFFD') ||
+      countLatin1Characters(decoded) >= mojibakeCount
+    ) {
+      break;
+    }
+    normalized = decoded;
+  }
+
+  return normalized;
 }
 
-function formatCellValue(value: ExcelJS.CellValue): string {
-  if (value === null || value === undefined) return '';
-  if (value instanceof Date) return formatDateTime(value);
-  if (typeof value !== 'object') return String(value);
-
-  const objectValue = value as unknown as Record<string, unknown>;
-  if (Array.isArray(objectValue.richText)) {
-    return objectValue.richText
-      .map((part) =>
-        typeof part === 'object' && part && 'text' in part
-          ? String((part as { text: unknown }).text)
-          : '',
-      )
-      .join('');
-  }
-  if ('result' in objectValue) {
-    return formatCellValue(objectValue.result as ExcelJS.CellValue);
-  }
-  if (typeof objectValue.text === 'string') return objectValue.text;
-  if (typeof objectValue.error === 'string') return objectValue.error;
-  return '';
-}
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(value);
+function countLatin1Characters(value: string) {
+  return value.match(/[\u0080-\u00ff]/g)?.length ?? 0;
 }

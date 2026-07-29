@@ -154,17 +154,6 @@ export class ProductsController {
     return this.productProcessAttachmentsService.create(Number(id), file);
   }
 
-  @Get(':id/process-attachments/:attachmentId/preview')
-  previewProcessAttachment(
-    @Param('id') id: string,
-    @Param('attachmentId') attachmentId: string,
-  ) {
-    return this.productProcessAttachmentsService.preview(
-      Number(id),
-      Number(attachmentId),
-    );
-  }
-
   @Get(':id/process-attachments/:attachmentId/file')
   @Header('Cache-Control', 'private, max-age=3600')
   async processAttachmentFile(
@@ -180,7 +169,7 @@ export class ProductsController {
     response.setHeader('Content-Length', result.attachment.size);
     response.setHeader(
       'Content-Disposition',
-      `attachment; filename="process-attachment${extname(result.attachment.originalName)}"; filename*=UTF-8''${encodeURIComponent(result.attachment.originalName)}`,
+      `attachment; filename="process-attachment${extname(result.attachment.originalName)}"; filename*=UTF-8''${encodeContentDispositionFilename(result.attachment.originalName)}`,
     );
     return result.file;
   }
@@ -210,4 +199,12 @@ function formatExportTimestamp() {
   })
     .format(new Date())
     .replace(/\D/g, '');
+}
+
+function encodeContentDispositionFilename(value: string) {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (character) =>
+      `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 }

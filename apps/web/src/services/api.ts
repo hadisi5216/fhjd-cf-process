@@ -187,18 +187,6 @@ export type ProductProcessAttachment = {
   createdAt: string;
 };
 
-export type ProductProcessAttachmentPreview =
-  | {
-      kind: 'word';
-      text: string;
-      truncated: boolean;
-    }
-  | {
-      kind: 'excel';
-      sheets: Array<{ name: string; rows: string[][] }>;
-      truncated: boolean;
-    };
-
 export type ProductInput = {
   rowNo?: number;
   productName: string;
@@ -360,13 +348,6 @@ export async function uploadProductProcessAttachment(id: number, file: File) {
   return response.data;
 }
 
-export async function getProductProcessAttachmentPreview(productId: number, attachmentId: number) {
-  const response = await api.get<ProductProcessAttachmentPreview>(
-    `/products/${productId}/process-attachments/${attachmentId}/preview`,
-  );
-  return response.data;
-}
-
 export async function getProductProcessAttachmentFile(productId: number, attachmentId: number) {
   const response = await api.get<Blob>(`/products/${productId}/process-attachments/${attachmentId}/file`, {
     responseType: 'blob',
@@ -446,8 +427,8 @@ export async function getWarnings() {
   return response.data;
 }
 
-export async function handleWarning(id: number, remark?: string) {
-  const response = await api.post<Warning>(`/warnings/${id}/handle`, { remark });
+export async function handleWarning(id: number, handledNote?: string) {
+  const response = await api.post<Warning>(`/warnings/${id}/handle`, { handledNote });
   return response.data;
 }
 

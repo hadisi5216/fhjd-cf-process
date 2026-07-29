@@ -46,4 +46,42 @@ describe('ProductsService', () => {
       include: { currentProcess: true },
     });
   });
+
+  it('clears nullable product text fields when empty values are submitted', async () => {
+    await service.update(7, {
+      serialNo: '  ',
+      remark: '',
+    });
+
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { serialNo: null, remark: null },
+      include: { currentProcess: true },
+    });
+  });
+
+  it('accepts null values from cleared form fields', async () => {
+    await service.update(7, {
+      serialNo: null,
+      remark: null,
+    });
+
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { serialNo: null, remark: null },
+      include: { currentProcess: true },
+    });
+  });
+
+  it('restores the default unit when the submitted unit is empty', async () => {
+    await service.update(7, {
+      unit: '  ',
+    });
+
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { unit: '件' },
+      include: { currentProcess: true },
+    });
+  });
 });

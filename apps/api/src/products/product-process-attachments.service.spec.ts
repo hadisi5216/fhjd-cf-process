@@ -1,5 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
-import ExcelJS from 'exceljs';
 import { access, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -76,46 +74,53 @@ describe('ProductProcessAttachmentsService', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('rejects file formats outside DOCX and XLSX', async () => {
-    await expect(
-      service.create(
-        1,
-        makeFile('工艺说明.pdf', 'application/pdf', Buffer.from('pdf')),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.productProcessAttachment.create).not.toHaveBeenCalled();
+  it('accepts attachments in any file format', async () => {
+    const result = await service.create(
+      1,
+      makeFile('工艺说明.pdf', 'application/pdf', Buffer.from('pdf')),
+    );
+
+    expect(result.originalName).toBe('工艺说明.pdf');
+    expect(result.mimeType).toBe('application/pdf');
+    expect(attachmentRecord?.storedName).toMatch(/\.pdf$/);
   });
 
-  it('parses XLSX worksheets for online preview', async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('装配工艺');
-    worksheet.addRow(['步骤', '要求']);
-    worksheet.addRow(['1', '完成装配']);
-    const workbookBuffer = await workbook.xlsx.writeBuffer();
-    const fileBuffer = Buffer.from(new Uint8Array(workbookBuffer));
+  it('repairs UTF-8 filenames exposed as Latin-1 text', async () => {
+    const mojibakeName = Buffer.from('装配工艺.xlsx', 'utf8').toString(
+      'latin1',
+    );
 
-    await service.create(
+    const result = await service.create(
       1,
       makeFile(
-        '装配工艺.xlsx',
+        mojibakeName,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        fileBuffer,
+        Buffer.from('xlsx-content'),
       ),
     );
 
-    await expect(service.preview(1, 12)).resolves.toEqual({
-      kind: 'excel',
-      sheets: [
-        {
-          name: '装配工艺',
-          rows: [
-            ['步骤', '要求'],
-            ['1', '完成装配'],
-          ],
-        },
-      ],
-      truncated: false,
-    });
+    expect(result.originalName).toBe('装配工艺.xlsx');
+    expect(attachmentRecord?.originalName).toBe('装配工艺.xlsx');
+  });
+
+  it('repairs historical filenames that were encoded twice', async () => {
+    const encodedOnce = Buffer.from('装配工艺.docx', 'utf8').toString(
+      'latin1',
+    );
+    attachmentRecord = {
+      id: 12,
+      productId: 1,
+      originalName: Buffer.from(encodedOnce, 'utf8').toString('latin1'),
+      storedName: 'stored.docx',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size: 12,
+      createdAt: new Date('2026-07-22T00:00:00.000Z'),
+    };
+
+    await expect(service.list(1)).resolves.toEqual([
+      expect.objectContaining({ originalName: '装配工艺.docx' }),
+    ]);
   });
 
   it('deletes metadata and the stored attachment', async () => {

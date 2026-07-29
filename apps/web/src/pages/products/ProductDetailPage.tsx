@@ -12,7 +12,6 @@ import {
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Button,
   Card,
   Descriptions,
@@ -24,7 +23,6 @@ import {
   Space,
   Spin,
   Table,
-  Tabs,
   Tag,
   Typography,
   message,
@@ -36,7 +34,6 @@ import {
   type FlowRecord,
   type ProductDrawing,
   type ProductProcessAttachment,
-  type ProductProcessAttachmentPreview,
   deleteProductDrawing,
   deleteProductProcessAttachment,
   getApiErrorMessage,
@@ -46,7 +43,6 @@ import {
   getProductDrawings,
   getProductFlows,
   getProductProcessAttachmentFile,
-  getProductProcessAttachmentPreview,
   getProductProcessAttachments,
   uploadProductDrawing,
   uploadProductProcessAttachment,
@@ -106,9 +102,6 @@ export function ProductDetailPage() {
   const validId = Number.isFinite(id) && id > 0;
   const queryClient = useQueryClient();
   const [processModalOpen, setProcessModalOpen] = useState(false);
-  const [processAttachmentPreviewOpen, setProcessAttachmentPreviewOpen] = useState(false);
-  const [selectedProcessAttachment, setSelectedProcessAttachment] = useState<ProductProcessAttachment>();
-  const [processAttachmentPreview, setProcessAttachmentPreview] = useState<ProductProcessAttachmentPreview>();
   const [processForm] = Form.useForm<ProcessForm>();
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const processAttachmentInputRef = useRef<HTMLInputElement>(null);
@@ -159,6 +152,7 @@ export function ProductDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-products'] });
+      await queryClient.invalidateQueries({ queryKey: ['screen-summary'] });
     },
     onError: () => {
       message.error('调整失败，请确认工序存在');
@@ -184,17 +178,6 @@ export function ProductDetailPage() {
     },
     onError: () => {
       message.error('工艺流程附件删除失败');
-    },
-  });
-
-  const previewProcessAttachmentMutation = useMutation({
-    mutationFn: (attachmentId: number) => getProductProcessAttachmentPreview(id, attachmentId),
-    onSuccess: (preview) => {
-      setProcessAttachmentPreview(preview);
-    },
-    onError: (error) => {
-      setProcessAttachmentPreviewOpen(false);
-      message.error(getApiErrorMessage(error, '工艺流程附件打开失败'));
     },
   });
 
@@ -248,13 +231,6 @@ export function ProductDetailPage() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (file) uploadProcessAttachmentMutation.mutate(file);
-  }
-
-  function previewProcessAttachment(attachment: ProductProcessAttachment) {
-    setSelectedProcessAttachment(attachment);
-    setProcessAttachmentPreview(undefined);
-    setProcessAttachmentPreviewOpen(true);
-    previewProcessAttachmentMutation.mutate(attachment.id);
   }
 
   async function downloadProcessAttachment(attachment: ProductProcessAttachment) {
@@ -362,10 +338,12 @@ export function ProductDetailPage() {
       dataIndex: 'originalName',
       render: (value: string, record) => (
         <span className="drawing-file-name">
-          {processAttachmentExtension(record) === 'docx' ? (
+          {['doc', 'docx'].includes(processAttachmentExtension(record)) ? (
             <FileWordOutlined className="is-word" />
-          ) : (
+          ) : ['xls', 'xlsx'].includes(processAttachmentExtension(record)) ? (
             <FileExcelOutlined className="is-excel" />
+          ) : (
+            <FileOutlined />
           )}
           {value}
         </span>
@@ -374,7 +352,8 @@ export function ProductDetailPage() {
     {
       title: '格式',
       width: 100,
-      render: (_value, record) => processAttachmentExtension(record).toUpperCase(),
+      render: (_value, record) =>
+        processAttachmentExtension(record).toUpperCase() || '-',
     },
     {
       title: '大小',
@@ -390,18 +369,9 @@ export function ProductDetailPage() {
     },
     {
       title: '操作',
-      width: 220,
+      width: 150,
       render: (_value, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            loading={previewProcessAttachmentMutation.isPending && selectedProcessAttachment?.id === record.id}
-            onClick={() => previewProcessAttachment(record)}
-          >
-            查看
-          </Button>
           <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => downloadProcessAttachment(record)}>
             下载
           </Button>
@@ -516,7 +486,6 @@ export function ProductDetailPage() {
               ref={processAttachmentInputRef}
               className="drawing-file-input"
               type="file"
-              accept=".docx,.xlsx"
               onChange={handleProcessAttachmentFileChange}
             />
             <Button
@@ -538,9 +507,7 @@ export function ProductDetailPage() {
           pagination={false}
           locale={{ emptyText: '暂无工艺流程附件' }}
         />
-        <div className="drawing-upload-hint">
-          支持 DOCX、XLSX，单个文件不超过 50 MB，可在线查看并下载原文件。
-        </div>
+        <div className="drawing-upload-hint">单个附件不超过 50 MB</div>
       </Card>
 
       <Card
@@ -586,76 +553,6 @@ export function ProductDetailPage() {
           locale={{ emptyText: '暂无工序流转记录' }}
         />
       </Card>
-
-      <Modal
-        title={selectedProcessAttachment ? `查看工艺流程 - ${selectedProcessAttachment.originalName}` : '查看工艺流程'}
-        open={processAttachmentPreviewOpen}
-        onCancel={() => setProcessAttachmentPreviewOpen(false)}
-        width={1000}
-        destroyOnHidden
-        footer={
-          <Space>
-            {selectedProcessAttachment ? (
-              <Button icon={<DownloadOutlined />} onClick={() => downloadProcessAttachment(selectedProcessAttachment)}>
-                下载原文件
-              </Button>
-            ) : null}
-            <Button type="primary" onClick={() => setProcessAttachmentPreviewOpen(false)}>
-              关闭
-            </Button>
-          </Space>
-        }
-      >
-        {previewProcessAttachmentMutation.isPending ? (
-          <div className="process-attachment-preview-loading">
-            <Spin />
-          </div>
-        ) : null}
-        {processAttachmentPreview?.truncated ? (
-          <Alert
-            className="process-attachment-preview-alert"
-            type="info"
-            showIcon
-            message="文件内容较多，在线查看仅展示部分内容，下载原文件可查看完整内容。"
-          />
-        ) : null}
-        {processAttachmentPreview?.kind === 'word' ? (
-          processAttachmentPreview.text ? (
-            <div className="process-word-preview">{processAttachmentPreview.text}</div>
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="文档中没有可显示的文字" />
-          )
-        ) : null}
-        {processAttachmentPreview?.kind === 'excel' ? (
-          processAttachmentPreview.sheets.length ? (
-            <Tabs
-              className="process-excel-tabs"
-              items={processAttachmentPreview.sheets.map((sheet) => ({
-                key: sheet.name,
-                label: sheet.name,
-                children: (
-                  <div className="process-excel-preview">
-                    <table>
-                      <tbody>
-                        {sheet.rows.map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            <th>{rowIndex + 1}</th>
-                            {row.map((cell, columnIndex) => (
-                              <td key={columnIndex}>{cell || '\u00A0'}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ),
-              }))}
-            />
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="工作簿中没有可显示的数据" />
-          )
-        ) : null}
-      </Modal>
 
       <Modal
         title="手动调整工序"

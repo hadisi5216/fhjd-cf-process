@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { createProcess, deleteProcess, getProcesses, updateProcess, type ProcessInput, type ProcessStep } from '../../services/api';
@@ -17,22 +17,20 @@ export function ProcessesPage() {
 
   const saveMutation = useMutation({
     mutationFn: (values: ProcessInput) => (editing ? updateProcess(editing.id, values) : createProcess(values)),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('工序已保存');
       setOpen(false);
       setEditing(null);
       form.resetFields();
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await invalidateProcessDependentQueries(queryClient);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteProcess,
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('工序已删除');
-      queryClient.invalidateQueries({ queryKey: ['processes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await invalidateProcessDependentQueries(queryClient);
     },
   });
 
@@ -116,4 +114,17 @@ export function ProcessesPage() {
       </Modal>
     </>
   );
+}
+
+async function invalidateProcessDependentQueries(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['processes'] }),
+    queryClient.invalidateQueries({ queryKey: ['products'] }),
+    queryClient.invalidateQueries({ queryKey: ['product-detail'] }),
+    queryClient.invalidateQueries({ queryKey: ['product-flows'] }),
+    queryClient.invalidateQueries({ queryKey: ['warnings'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard-products'] }),
+    queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+  ]);
 }

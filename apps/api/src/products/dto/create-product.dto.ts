@@ -22,7 +22,7 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
-  serialNo?: string;
+  serialNo?: string | null;
 
   @IsOptional()
   @IsInt()
@@ -32,10 +32,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  unit?: string;
+  unit?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  remark?: string;
+  remark?: string | null;
 }

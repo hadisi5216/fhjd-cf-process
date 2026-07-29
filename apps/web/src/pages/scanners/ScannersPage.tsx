@@ -25,20 +25,26 @@ export function ScannersPage() {
 
   const saveMutation = useMutation({
     mutationFn: (values: ScannerInput) => (editing ? updateScanner(editing.id, values) : createScanner(values)),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('扫码枪已保存');
       setOpen(false);
       setEditing(null);
       form.resetFields();
-      queryClient.invalidateQueries({ queryKey: ['scanners'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['scanners'] }),
+        queryClient.invalidateQueries({ queryKey: ['product-flows'] }),
+      ]);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteScanner,
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('扫码枪已删除');
-      queryClient.invalidateQueries({ queryKey: ['scanners'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['scanners'] }),
+        queryClient.invalidateQueries({ queryKey: ['product-flows'] }),
+      ]);
     },
   });
 

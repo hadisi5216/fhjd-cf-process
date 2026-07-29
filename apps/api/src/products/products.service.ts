@@ -145,9 +145,14 @@ export class ProductsService {
   }
 }
 
-function normalizeOptionalText(value?: string) {
+function normalizeOptionalText(value?: string | null) {
   const normalized = value?.trim();
   return normalized || undefined;
+}
+
+function normalizeNullableText(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized || null;
 }
 
 function buildProductFilter(
@@ -186,22 +191,31 @@ function buildProductFilter(
 }
 
 function normalizeUpdateProductData(dto: UpdateProductDto) {
+  const {
+    productName,
+    productModel,
+    serialNo,
+    unit,
+    remark,
+    ...unchangedFields
+  } = dto;
+
   return {
-    ...dto,
-    ...(dto.productName !== undefined
-      ? { productName: dto.productName.trim() }
+    ...unchangedFields,
+    ...(productName !== undefined
+      ? { productName: productName.trim() }
       : {}),
-    ...(dto.productModel !== undefined
-      ? { productModel: dto.productModel.trim() }
+    ...(productModel !== undefined
+      ? { productModel: productModel.trim() }
       : {}),
-    ...(dto.serialNo !== undefined
-      ? { serialNo: normalizeOptionalText(dto.serialNo) }
+    ...(serialNo !== undefined
+      ? { serialNo: normalizeNullableText(serialNo) }
       : {}),
-    ...(dto.unit !== undefined
-      ? { unit: normalizeOptionalText(dto.unit) }
+    ...(unit !== undefined
+      ? { unit: normalizeOptionalText(unit) ?? '件' }
       : {}),
-    ...(dto.remark !== undefined
-      ? { remark: normalizeOptionalText(dto.remark) }
+    ...(remark !== undefined
+      ? { remark: normalizeNullableText(remark) }
       : {}),
   };
 }

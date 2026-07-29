@@ -14,10 +14,13 @@ export function WarningsPage() {
 
   const handleMutation = useMutation({
     mutationFn: (id: number) => handleWarning(id, '管理员已确认处理'),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('预警已处理');
-      queryClient.invalidateQueries({ queryKey: ['warnings'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['warnings'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+      ]);
     },
   });
 
