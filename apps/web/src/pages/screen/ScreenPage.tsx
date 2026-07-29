@@ -16,27 +16,43 @@ type ScreenProduct = {
 const TABLE_ROW_HEIGHT = 33;
 const ROW_STEP_INTERVAL_MS = 2000;
 const END_HOLD_STEPS = 1;
+const SCREEN_REFRESH_INTERVAL_MS = 5000;
 const SCREEN_PROCESS_ORDER = ['打磨', '装配', '包覆', '涂装'];
 const SCREEN_PROCESS_NAMES: Record<string, string> = {
   喷漆: '涂装',
 };
 
-function pad(value: number) {
-  return value.toString().padStart(2, '0');
-}
+const SERVER_CLOCK_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
 
 function formatClock(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  const parts = SERVER_CLOCK_FORMATTER
+    .formatToParts(date)
+    .reduce<Record<string, string>>((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-function hoursAgo(hours: number) {
-  return new Date(Date.now() - hours * 3_600_000).toISOString();
+function hoursAgo(hours: number, referenceTimeMs: number) {
+  return new Date(referenceTimeMs - hours * 3_600_000).toISOString();
 }
 
-function elapsedText(value?: string) {
+function elapsedText(value: string | undefined, serverNowMs: number) {
   if (!value) return '-';
   const enteredAt = getApiDateTime(value);
-  const elapsedMs = enteredAt ? Date.now() - enteredAt : Number.NaN;
+  const elapsedMs = enteredAt
+    ? serverNowMs - enteredAt
+    : Number.NaN;
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '-';
 
   const totalMinutes = Math.floor(elapsedMs / 60_000);
@@ -49,10 +65,12 @@ function elapsedText(value?: string) {
   return `${minutes}分钟`;
 }
 
-function isOverdue(value?: string) {
+function isOverdue(value: string | undefined, serverNowMs: number) {
   if (!value) return false;
   const enteredAt = getApiDateTime(value);
-  return enteredAt ? Date.now() - enteredAt >= 72 * 3_600_000 : false;
+  return enteredAt
+    ? serverNowMs - enteredAt >= 72 * 3_600_000
+    : false;
 }
 
 function sortByElapsedDesc(products: ScreenProduct[]) {
@@ -63,7 +81,10 @@ function sortByElapsedDesc(products: ScreenProduct[]) {
   });
 }
 
-function makePreviewProducts(startId: number): ScreenProduct[] {
+function makePreviewProducts(
+  startId: number,
+  referenceTimeMs: number,
+): ScreenProduct[] {
   const models = [
     'J/CLL9-12A-101S1.1',
     'J/CLL9-50A-101S1.1',
@@ -87,18 +108,11 @@ function makePreviewProducts(startId: number): ScreenProduct[] {
         productName: model.split('+')[0],
         productModel: model,
         status: elapsedHours >= 72 ? 'OVERDUE' : 'IN_PROGRESS',
-        currentEnteredAt: hoursAgo(elapsedHours),
+        currentEnteredAt: hoursAgo(elapsedHours, referenceTimeMs),
       };
     }),
   );
 }
-
-const previewProducts: Record<string, ScreenProduct[]> = {
-  打磨: makePreviewProducts(1000),
-  装配: makePreviewProducts(2000),
-  包覆: makePreviewProducts(4000),
-  涂装: makePreviewProducts(3000),
-};
 
 export function ScreenPage() {
   const queryClient = useQueryClient();
@@ -109,7 +123,7 @@ export function ScreenPage() {
   const { data } = useQuery({
     queryKey: ['screen-summary'],
     queryFn: getDashboardSummary,
-    refetchInterval: 5000,
+    refetchInterval: SCREEN_REFRESH_INTERVAL_MS,
     retry: false,
   });
   const { data: settings } = useQuery({
@@ -118,11 +132,15 @@ export function ScreenPage() {
     refetchInterval: 5000,
     retry: false,
   });
+  const serverTimeOffsetMs = data?.serverTimeOffsetMs ?? 0;
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    const updateServerClock = () =>
+      setNow(new Date(Date.now() + serverTimeOffsetMs));
+    updateServerClock();
+    const timer = window.setInterval(updateServerClock, 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [serverTimeOffsetMs]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setRowStep((current) => current + 1), ROW_STEP_INTERVAL_MS);
@@ -188,15 +206,34 @@ export function ScreenPage() {
 
   const processStats = data?.byProcess ?? [];
   const usePreviewData = settings?.screenPreviewDataEnabled ?? true;
-  const refreshCountdown = 5 - (now.getSeconds() % 5);
-  const refreshTick = refreshCountdown === 5;
+  const serverNowMs = now.getTime();
+  const previewProducts: Record<string, ScreenProduct[]> = {
+    打磨: makePreviewProducts(1000, serverNowMs),
+    装配: makePreviewProducts(2000, serverNowMs),
+    包覆: makePreviewProducts(4000, serverNowMs),
+    涂装: makePreviewProducts(3000, serverNowMs),
+  };
+  const lastServerSyncMs =
+    getApiDateTime(data?.serverTime) ?? serverNowMs;
+  const refreshCountdown = Math.max(
+    0,
+    Math.ceil(
+      (lastServerSyncMs +
+        SCREEN_REFRESH_INTERVAL_MS -
+        serverNowMs) /
+        1000,
+    ),
+  );
+  const refreshTick = refreshCountdown === 0;
   const displayStats = processStats
     .map((process) => {
       const displayName = SCREEN_PROCESS_NAMES[process.name] ?? process.name;
       const products = (usePreviewData ? previewProducts[displayName] : undefined) ?? process.products ?? [];
       const sortedProducts = sortByElapsedDesc(products);
       const overdueCount = sortedProducts.filter(
-        (product) => product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt),
+        (product) =>
+          product.status === 'OVERDUE' ||
+          isOverdue(product.currentEnteredAt, serverNowMs),
       ).length;
       return { ...process, name: displayName, count: sortedProducts.length, overdueCount, products: sortedProducts };
     })
@@ -208,7 +245,11 @@ export function ScreenPage() {
   const previewTotal = displayStats.reduce((sum, process) => sum + process.products.length, 0);
   const overdueTotal = displayStats
     .flatMap((item) => item.products)
-    .filter((item) => item.status === 'OVERDUE' || isOverdue(item.currentEnteredAt)).length;
+    .filter(
+      (item) =>
+        item.status === 'OVERDUE' ||
+        isOverdue(item.currentEnteredAt, serverNowMs),
+    ).length;
 
   return (
     <main className="screen-command-page">
@@ -292,7 +333,12 @@ export function ScreenPage() {
                     role="rowgroup"
                   >
                     {process.products.map((product) => {
-                      const overdue = product.status === 'OVERDUE' || isOverdue(product.currentEnteredAt);
+                      const overdue =
+                        product.status === 'OVERDUE' ||
+                        isOverdue(
+                          product.currentEnteredAt,
+                          serverNowMs,
+                        );
                       return (
                         <div
                           className={`screen-command-data-row${overdue ? ' is-alert' : ''}`}
@@ -300,7 +346,12 @@ export function ScreenPage() {
                           role="row"
                         >
                           <span role="cell">{product.productModel}</span>
-                          <span role="cell">{elapsedText(product.currentEnteredAt)}</span>
+                          <span role="cell">
+                            {elapsedText(
+                              product.currentEnteredAt,
+                              serverNowMs,
+                            )}
+                          </span>
                         </div>
                       );
                     })}

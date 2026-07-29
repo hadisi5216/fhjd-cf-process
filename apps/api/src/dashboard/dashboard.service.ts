@@ -37,6 +37,7 @@ export class DashboardService {
     ]);
 
     return {
+      serverTime: new Date().toISOString(),
       total,
       inProgress,
       finished,

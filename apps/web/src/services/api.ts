@@ -107,6 +107,8 @@ export async function changeAdminPassword(oldPassword: string, newPassword: stri
 }
 
 export type DashboardSummary = {
+  serverTime: string;
+  serverTimeOffsetMs?: number;
   total: number;
   inProgress: number;
   finished: number;
@@ -262,6 +264,8 @@ function isDashboardSummary(value: unknown): value is DashboardSummary {
 
   const candidate = value as Partial<DashboardSummary>;
   return (
+    typeof candidate.serverTime === 'string' &&
+    Number.isFinite(Date.parse(candidate.serverTime)) &&
     typeof candidate.total === 'number' &&
     typeof candidate.inProgress === 'number' &&
     typeof candidate.finished === 'number' &&
@@ -276,7 +280,11 @@ export async function getDashboardSummary() {
     throw new Error('Invalid dashboard summary response');
   }
 
-  return response.data;
+  return {
+    ...response.data,
+    serverTimeOffsetMs:
+      new Date(response.data.serverTime).getTime() - Date.now(),
+  };
 }
 
 export async function getProducts(keyword?: string, status?: Product['status'], processId?: number) {
