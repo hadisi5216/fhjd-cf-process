@@ -51,6 +51,7 @@ export function ProductsPage() {
   const [status, setStatus] = useState<Product['status'] | undefined>(() => readStatusParam(statusParam));
   const [processId, setProcessId] = useState<number | undefined>();
   const [editing, setEditing] = useState<Product | null>(null);
+  const [copyingFrom, setCopyingFrom] = useState<Product | null>(null);
   const [quickCreating, setQuickCreating] = useState(false);
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -78,12 +79,14 @@ export function ProductsPage() {
     mutationFn: (values: ProductInput) => (editing ? updateProduct(editing.id, values) : createProduct(values)),
     onSuccess: async (savedProduct) => {
       const wasEditing = Boolean(editing);
-      message.success(wasEditing ? '产品已更新' : '产品已新增');
+      const wasCopying = Boolean(copyingFrom);
+      message.success(wasEditing ? '产品已更新' : wasCopying ? '产品已复制新增' : '产品已新增');
       if (wasEditing) {
         queryClient.setQueryData(['product-detail', savedProduct.id], savedProduct);
       }
       setModalOpen(false);
       setEditing(null);
+      setCopyingFrom(null);
       setQuickCreating(false);
       form.resetFields();
       await Promise.all([
@@ -119,6 +122,7 @@ export function ProductsPage() {
 
   function openCreate() {
     setEditing(null);
+    setCopyingFrom(null);
     setQuickCreating(false);
     form.resetFields();
     form.setFieldsValue({ quantity: 1, unit: '件' });
@@ -127,6 +131,7 @@ export function ProductsPage() {
 
   async function openQuickCreate() {
     setQuickCreateLoading(true);
+    setCopyingFrom(null);
     try {
       const latestProducts = await queryClient.fetchQuery({
         queryKey: ['products', 'quick-create-source'],
@@ -139,16 +144,7 @@ export function ProductsPage() {
       setQuickCreating(true);
       form.resetFields();
       form.setFieldsValue(
-        latestProduct
-          ? {
-              productName: latestProduct.productName,
-              productModel: latestProduct.productModel,
-              serialNo: latestProduct.serialNo ?? '',
-              quantity: latestProduct.quantity,
-              unit: latestProduct.unit,
-              remark: latestProduct.remark ?? '',
-            }
-          : { quantity: 1, unit: '件' },
+        latestProduct ? getProductFormValues(latestProduct) : { quantity: 1, unit: '件' },
       );
       setModalOpen(true);
 
@@ -164,15 +160,18 @@ export function ProductsPage() {
 
   function openEdit(record: Product) {
     setEditing(record);
+    setCopyingFrom(null);
     setQuickCreating(false);
-    form.setFieldsValue({
-      productName: record.productName,
-      productModel: record.productModel,
-      serialNo: record.serialNo ?? '',
-      quantity: record.quantity,
-      unit: record.unit,
-      remark: record.remark ?? '',
-    });
+    form.setFieldsValue(getProductFormValues(record));
+    setModalOpen(true);
+  }
+
+  function openCopy(record: Product) {
+    setEditing(null);
+    setCopyingFrom(record);
+    setQuickCreating(false);
+    form.resetFields();
+    form.setFieldsValue(getProductFormValues(record));
     setModalOpen(true);
   }
 
@@ -313,11 +312,12 @@ export function ProductsPage() {
             },
             {
               title: '操作',
-              width: 180,
+              width: 220,
               render: (_, record) => (
                 <Space onClick={(event) => event.stopPropagation()}>
                   <a onClick={() => openDetail(record.id)}>详情</a>
                   <a onClick={() => openEdit(record)}>编辑</a>
+                  <a onClick={() => openCopy(record)}>复制</a>
                   <Popconfirm title="确认删除该产品？" onConfirm={() => deleteMutation.mutate(record.id)}>
                     <a>删除</a>
                   </Popconfirm>
@@ -330,10 +330,11 @@ export function ProductsPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑产品' : quickCreating ? '快速新增产品' : '新增产品'}
+        title={editing ? '编辑产品' : copyingFrom ? '复制新增产品' : quickCreating ? '快速新增产品' : '新增产品'}
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false);
+          setCopyingFrom(null);
           setQuickCreating(false);
         }}
         onOk={() => form.submit()}
@@ -365,6 +366,17 @@ export function ProductsPage() {
       </Modal>
     </>
   );
+}
+
+function getProductFormValues(product: Product): ProductInput {
+  return {
+    productName: product.productName,
+    productModel: product.productModel,
+    serialNo: product.serialNo ?? '',
+    quantity: product.quantity,
+    unit: product.unit,
+    remark: product.remark ?? '',
+  };
 }
 
 function formatExportTimestamp() {
