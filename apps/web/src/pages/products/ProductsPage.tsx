@@ -224,7 +224,7 @@ export function ProductsPage() {
           <Typography.Title level={2} className="page-title">
             产品管理
           </Typography.Title>
-          <div className="page-kicker">手动维护产品档案，扫码枪按二维码内容识别产品并记录流转。</div>
+          <div className="page-kicker">维护产品档案，扫码枪按二维码内容识别产品并记录流转。</div>
         </div>
         <Space>
           <Button
@@ -274,7 +274,6 @@ export function ProductsPage() {
             />
             <Button onClick={clearFilters}>重置</Button>
           </Space>
-          <Tag color="#126e78">当前仅支持手动单条维护</Tag>
         </div>
         <Table
           rowKey="id"
