@@ -518,15 +518,15 @@
 }
 
 .screen-command-page.screen-list-font-large {
-  --screen-list-font-size: 16px;
-  --screen-time-column-width: 106px;
-  --screen-row-height: 37px;
-}
-
-.screen-command-page.screen-list-font-extra-large {
   --screen-list-font-size: 18px;
   --screen-time-column-width: 118px;
   --screen-row-height: 42px;
+}
+
+.screen-command-page.screen-list-font-extra-large {
+  --screen-list-font-size: 22px;
+  --screen-time-column-width: 132px;
+  --screen-row-height: 50px;
 }
 
 .screen-command-top {
@@ -1033,6 +1033,19 @@
 
 .settings-font-size-row .ant-segmented {
   flex: 0 0 auto;
+}
+
+.settings-font-size-row .ant-segmented-item-selected,
+.settings-font-size-row .ant-segmented-item-selected:hover,
+.settings-font-size-row .ant-segmented-item-selected:focus-visible {
+  background: #126e78;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.settings-font-size-row .ant-segmented-thumb {
+  background: #126e78;
+  box-shadow: none;
 }
 
 .settings-help-text {

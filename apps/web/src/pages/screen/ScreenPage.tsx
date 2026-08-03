@@ -29,8 +29,8 @@ const SCREEN_LIST_FONT_SIZE_CLASSES = {
 const SCREEN_LIST_ROW_HEIGHTS = {
   SMALL: 30,
   STANDARD: 33,
-  LARGE: 37,
-  EXTRA_LARGE: 42,
+  LARGE: 42,
+  EXTRA_LARGE: 50,
 } as const;
 
 const SERVER_CLOCK_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
