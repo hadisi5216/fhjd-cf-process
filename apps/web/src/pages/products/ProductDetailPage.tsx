@@ -477,6 +477,28 @@ export function ProductDetailPage() {
         </Descriptions>
       </Card>
 
+      <Card className="module-card detail-card" title="工序负责人">
+        <Descriptions
+          className="product-owner-descriptions"
+          column={{ xs: 1, md: 2, xl: 4 }}
+          bordered
+          layout="vertical"
+          size="middle"
+        >
+          {(product.processOwners ?? []).map((owner) => (
+            <Descriptions.Item
+              key={owner.processStepId}
+              label={owner.processStep?.name ?? '工序'}
+            >
+              {owner.personnel?.name ?? '-'}
+            </Descriptions.Item>
+          ))}
+        </Descriptions>
+        {!product.processOwners?.length ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂未分配工序负责人" />
+        ) : null}
+      </Card>
+
       <Card
         className="module-card detail-card"
         title="工艺流程附件"

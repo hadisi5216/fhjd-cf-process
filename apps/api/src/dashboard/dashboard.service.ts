@@ -6,35 +6,44 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async summary() {
-    const [total, inProgress, finished, overdue, processSteps] = await Promise.all([
-      this.prisma.product.count(),
-      this.prisma.product.count({ where: { status: 'IN_PROGRESS' } }),
-      this.prisma.product.count({ where: { status: 'FINISHED' } }),
-      this.prisma.warning.count({ where: { status: 'OPEN' } }),
-      this.prisma.processStep.findMany({
-        where: {
-          name: { not: '完工' },
-        },
-        orderBy: { sortOrder: 'asc' },
-        include: {
-          products: {
-            where: {
-              status: { in: ['IN_PROGRESS', 'OVERDUE'] },
-              currentEnteredAt: { not: null },
-            },
-            orderBy: [{ currentEnteredAt: 'asc' }, { createdAt: 'asc' }],
-            select: {
-              id: true,
-              productName: true,
-              productModel: true,
-              serialNo: true,
-              status: true,
-              currentEnteredAt: true,
+    const [total, inProgress, finished, overdue, processSteps] =
+      await Promise.all([
+        this.prisma.product.count(),
+        this.prisma.product.count({ where: { status: 'IN_PROGRESS' } }),
+        this.prisma.product.count({ where: { status: 'FINISHED' } }),
+        this.prisma.warning.count({ where: { status: 'OPEN' } }),
+        this.prisma.processStep.findMany({
+          where: {
+            name: { not: '完工' },
+          },
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            products: {
+              where: {
+                status: { in: ['IN_PROGRESS', 'OVERDUE'] },
+                currentEnteredAt: { not: null },
+              },
+              orderBy: [{ currentEnteredAt: 'asc' }, { createdAt: 'asc' }],
+              select: {
+                id: true,
+                productName: true,
+                productModel: true,
+                serialNo: true,
+                status: true,
+                currentEnteredAt: true,
+                processOwners: {
+                  select: {
+                    processStepId: true,
+                    personnel: {
+                      select: { name: true },
+                    },
+                  },
+                },
+              },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     return {
       serverTime: new Date().toISOString(),
@@ -46,7 +55,12 @@ export class DashboardService {
         id: step.id,
         name: step.name,
         count: step.products.length,
-        products: step.products,
+        products: step.products.map(({ processOwners, ...product }) => ({
+          ...product,
+          ownerName:
+            processOwners.find((owner) => owner.processStepId === step.id)
+              ?.personnel.name ?? null,
+        })),
       })),
     };
   }

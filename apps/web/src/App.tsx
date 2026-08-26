@@ -3,6 +3,7 @@ import { AppLayout } from './app/AppLayout';
 import { ProtectedRoute } from './app/ProtectedRoute';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { LoginPage } from './pages/login/LoginPage';
+import { PersonnelPage } from './pages/personnel/PersonnelPage';
 import { ProcessesPage } from './pages/processes/ProcessesPage';
 import { ProductDetailPage } from './pages/products/ProductDetailPage';
 import { ProductsPage } from './pages/products/ProductsPage';
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
+          <Route path="personnel" element={<PersonnelPage />} />
           <Route path="processes" element={<ProcessesPage />} />
           <Route path="scanners" element={<ScannersPage />} />
           <Route path="warnings" element={<WarningsPage />} />

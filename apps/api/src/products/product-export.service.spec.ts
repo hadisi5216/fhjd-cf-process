@@ -16,6 +16,12 @@ describe('ProductExportService', () => {
           { originalName: '装配工艺.docx' },
           { originalName: '检验记录.xlsx' },
         ],
+        processOwners: [
+          {
+            processStep: { name: '打磨' },
+            personnel: { name: '张工' },
+          },
+        ],
         status: 'IN_PROGRESS',
         currentEnteredAt: new Date('2026-07-22T00:00:00.000Z'),
         createdAt: new Date('2026-07-21T00:00:00.000Z'),
@@ -31,7 +37,8 @@ describe('ProductExportService', () => {
     expect(worksheet?.rowCount).toBe(2);
     expect(worksheet?.getCell('A2').value).toBe('12号舵舱体');
     expect(worksheet?.getCell('B2').value).toBe('J/CLL9-12A-101S1.1');
-    expect(worksheet?.getCell('G2').value).toBe('加工中');
-    expect(worksheet?.getCell('H2').value).toBe('装配工艺.docx\n检验记录.xlsx');
+    expect(worksheet?.getCell('G2').value).toBe('打磨：张工');
+    expect(worksheet?.getCell('H2').value).toBe('加工中');
+    expect(worksheet?.getCell('I2').value).toBe('装配工艺.docx\n检验记录.xlsx');
   });
 });

@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PersonnelModule } from './personnel/personnel.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProcessesModule } from './processes/processes.module';
 import { ProductsModule } from './products/products.module';
@@ -22,6 +23,7 @@ import { WarningsModule } from './warnings/warnings.module';
     RealtimeModule,
     AuthModule,
     AdminsModule,
+    PersonnelModule,
     ProductsModule,
     ProcessesModule,
     ScannersModule,

@@ -5,6 +5,7 @@ import {
   DashboardOutlined,
   LogoutOutlined,
   SettingOutlined,
+  TeamOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
 import { Badge, Button, Layout, Menu, Typography } from 'antd';
@@ -21,6 +22,7 @@ const menuItems = [
   { key: '/processes', icon: <ClusterOutlined />, label: '工序配置' },
   { key: '/scanners', icon: <ToolOutlined />, label: '扫码枪管理' },
   { key: '/warnings', icon: <AlertOutlined />, label: '预警中心' },
+  { key: '/personnel', icon: <TeamOutlined />, label: '人员管理' },
   { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
   { key: '/screen', icon: <AppstoreOutlined />, label: '大屏看板' },
 ];

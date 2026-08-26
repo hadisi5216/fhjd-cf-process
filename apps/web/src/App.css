@@ -487,6 +487,7 @@
   --screen-text: #f5faff;
   --screen-text-muted: #9fb8cf;
   --screen-list-font-size: 14px;
+  --screen-owner-column-width: 64px;
   --screen-time-column-width: 96px;
   --screen-row-height: 33px;
   position: fixed;
@@ -507,24 +508,28 @@
 
 .screen-command-page.screen-list-font-small {
   --screen-list-font-size: 12px;
+  --screen-owner-column-width: 56px;
   --screen-time-column-width: 90px;
   --screen-row-height: 30px;
 }
 
 .screen-command-page.screen-list-font-standard {
   --screen-list-font-size: 14px;
+  --screen-owner-column-width: 64px;
   --screen-time-column-width: 96px;
   --screen-row-height: 33px;
 }
 
 .screen-command-page.screen-list-font-large {
   --screen-list-font-size: 18px;
+  --screen-owner-column-width: 76px;
   --screen-time-column-width: 118px;
   --screen-row-height: 42px;
 }
 
 .screen-command-page.screen-list-font-extra-large {
   --screen-list-font-size: 22px;
+  --screen-owner-column-width: 92px;
   --screen-time-column-width: 132px;
   --screen-row-height: 50px;
 }
@@ -865,6 +870,7 @@
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
+    var(--screen-owner-column-width)
     var(--screen-time-column-width);
   height: var(--screen-row-height);
   box-sizing: border-box;
@@ -910,6 +916,11 @@
 .screen-command-data-row span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.product-owner-descriptions .ant-descriptions-item-label,
+.product-owner-descriptions .ant-descriptions-item-content {
+  text-align: center;
 }
 
 .screen-command-data-row span:last-child {
@@ -1053,6 +1064,31 @@
   color: #667085;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.product-owner-section {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid #edf1f6;
+}
+
+.product-owner-section .ant-typography {
+  margin: 0 0 14px;
+  color: #344054;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.product-owner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+@media (max-width: 640px) {
+  .product-owner-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-note ul {

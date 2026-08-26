@@ -8,12 +8,17 @@ import {
   deleteProduct,
   exportProducts,
   getApiErrorMessage,
+  getPersonnel,
   getProcesses,
   getProducts,
   updateProduct,
   type Product,
   type ProductInput,
 } from '../../services/api';
+
+type ProductFormValues = Omit<ProductInput, 'processOwners'> & {
+  processOwnerIds?: Record<string, number>;
+};
 
 const statusOptions: Array<{ label: string; value: Product['status'] }> = [
   { label: '待扫码', value: 'PENDING' },
@@ -56,7 +61,7 @@ export function ProductsPage() {
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [form] = Form.useForm<ProductInput>();
+  const [form] = Form.useForm<ProductFormValues>();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -68,6 +73,14 @@ export function ProductsPage() {
     queryFn: getProcesses,
     retry: false,
   });
+  const { data: personnel = [] } = useQuery({
+    queryKey: ['personnel'],
+    queryFn: () => getPersonnel(),
+    retry: false,
+  });
+  const productionProcesses = processes.filter(
+    (process) => process.enabled && process.name !== '完工',
+  );
 
   const { data = [], isLoading, isFetching } = useQuery({
     queryKey: ['products', keyword, status, processId],
@@ -76,7 +89,12 @@ export function ProductsPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: ProductInput) => (editing ? updateProduct(editing.id, values) : createProduct(values)),
+    mutationFn: (values: ProductFormValues) => {
+      const input = toProductInput(values, productionProcesses);
+      return editing
+        ? updateProduct(editing.id, input)
+        : createProduct(input);
+    },
     onSuccess: async (savedProduct) => {
       const wasEditing = Boolean(editing);
       const wasCopying = Boolean(copyingFrom);
@@ -339,6 +357,7 @@ export function ProductsPage() {
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
         destroyOnHidden
+        width={720}
       >
         <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => saveMutation.mutate(values)}>
           <Form.Item name="productName" label="产品名称" rules={[{ required: true, message: '请输入产品名称' }]}>
@@ -361,13 +380,53 @@ export function ProductsPage() {
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={3} autoComplete="off" placeholder="请输入备注" />
           </Form.Item>
+          <div className="product-owner-section">
+            <Typography.Title level={5}>工序负责人</Typography.Title>
+            <div className="product-owner-grid">
+              {productionProcesses.map((process) => {
+                const processPersonnel = personnel.filter(
+                  (person) => person.processStepId === process.id,
+                );
+                return (
+                  <Form.Item
+                    key={process.id}
+                    name={['processOwnerIds', String(process.id)]}
+                    label={`${process.name}负责人`}
+                    rules={[
+                      {
+                        required: true,
+                        message: `请选择${process.name}负责人`,
+                      },
+                    ]}
+                  >
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      placeholder={
+                        processPersonnel.some((person) => person.enabled)
+                          ? `请选择${process.name}负责人`
+                          : `请先录入${process.name}人员`
+                      }
+                      options={processPersonnel.map((person) => ({
+                        label: person.enabled
+                          ? person.name
+                          : `${person.name}（已停用）`,
+                        value: person.id,
+                        disabled: !person.enabled,
+                      }))}
+                    />
+                  </Form.Item>
+                );
+              })}
+            </div>
+          </div>
         </Form>
       </Modal>
     </>
   );
 }
 
-function getProductFormValues(product: Product): ProductInput {
+function getProductFormValues(product: Product): ProductFormValues {
   return {
     productName: product.productName,
     productModel: product.productModel,
@@ -375,6 +434,26 @@ function getProductFormValues(product: Product): ProductInput {
     quantity: product.quantity,
     unit: product.unit,
     remark: product.remark ?? '',
+    processOwnerIds: Object.fromEntries(
+      (product.processOwners ?? []).map((owner) => [
+        String(owner.processStepId),
+        owner.personnelId,
+      ]),
+    ),
+  };
+}
+
+function toProductInput(
+  values: ProductFormValues,
+  processes: Array<{ id: number }>,
+): ProductInput {
+  const { processOwnerIds = {}, ...productFields } = values;
+  return {
+    ...productFields,
+    processOwners: processes.map((process) => ({
+      processStepId: process.id,
+      personnelId: processOwnerIds[String(process.id)],
+    })),
   };
 }
 

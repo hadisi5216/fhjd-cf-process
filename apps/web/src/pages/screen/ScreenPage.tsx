@@ -11,6 +11,7 @@ type ScreenProduct = {
   productModel: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
   currentEnteredAt?: string;
+  ownerName?: string | null;
 };
 
 const ROW_STEP_INTERVAL_MS = 2000;
@@ -108,6 +109,7 @@ function makePreviewProducts(
     'J/CLL9-50A-101S1.1+02',
     'J/CLL9-52A-101S1.1+01',
   ];
+  const ownerNames = ['张伟', '李强', '王磊', '赵敏'];
 
   return sortByElapsedDesc(
     Array.from({ length: 40 }, (_, index) => {
@@ -120,6 +122,7 @@ function makePreviewProducts(
         productModel: model,
         status: elapsedHours >= 72 ? 'OVERDUE' : 'IN_PROGRESS',
         currentEnteredAt: hoursAgo(elapsedHours, referenceTimeMs),
+        ownerName: ownerNames[(index + startId) % ownerNames.length],
       };
     }),
   );
@@ -349,6 +352,7 @@ export function ScreenPage() {
                       <div className="screen-command-grid-row" key={index}>
                         <span />
                         <span />
+                        <span />
                       </div>
                     ))}
                   </div>
@@ -373,6 +377,7 @@ export function ScreenPage() {
                           role="row"
                         >
                           <span role="cell">{product.productModel}</span>
+                          <span role="cell">{product.ownerName || '-'}</span>
                           <span role="cell">
                             {elapsedText(
                               product.currentEnteredAt,

@@ -9,6 +9,10 @@ export type ProductExportRow = {
   unit: string;
   remark: string | null;
   processAttachments: Array<{ originalName: string }>;
+  processOwners: Array<{
+    processStep: { name: string };
+    personnel: { name: string };
+  }>;
   status: string;
   currentEnteredAt: Date | null;
   createdAt: Date;
@@ -40,6 +44,7 @@ export class ProductExportService {
       { header: '数量', key: 'quantity', width: 10 },
       { header: '单位', key: 'unit', width: 10 },
       { header: '当前工序', key: 'currentProcess', width: 14 },
+      { header: '工序负责人', key: 'processOwners', width: 30 },
       { header: '状态', key: 'status', width: 12 },
       { header: '工艺流程附件', key: 'processAttachments', width: 38 },
       { header: '备注', key: 'remark', width: 24 },
@@ -56,6 +61,9 @@ export class ProductExportService {
         quantity: product.quantity,
         unit: product.unit,
         currentProcess: product.currentProcess?.name ?? '待扫码',
+        processOwners: product.processOwners
+          .map((owner) => `${owner.processStep.name}：${owner.personnel.name}`)
+          .join('\n'),
         status: STATUS_LABELS[product.status] ?? product.status,
         processAttachments: product.processAttachments
           .map((attachment) => attachment.originalName)
@@ -79,7 +87,7 @@ export class ProductExportService {
 
     worksheet.autoFilter = {
       from: 'A1',
-      to: `L${Math.max(products.length + 1, 1)}`,
+      to: `M${Math.max(products.length + 1, 1)}`,
     };
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;

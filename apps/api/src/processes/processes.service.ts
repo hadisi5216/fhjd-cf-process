@@ -14,6 +14,7 @@ export class ProcessesService {
           select: {
             scanners: true,
             products: true,
+            personnel: true,
           },
         },
       },

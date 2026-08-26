@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangeProductProcessDto } from './dto/change-product-process.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -6,6 +10,18 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductDrawingsService } from './product-drawings.service';
 import { ProductExportService } from './product-export.service';
 import { ProductProcessAttachmentsService } from './product-process-attachments.service';
+import { ProductProcessOwnerDto } from './dto/product-process-owner.dto';
+
+const productRelations = {
+  currentProcess: true,
+  processOwners: {
+    include: {
+      processStep: true,
+      personnel: true,
+    },
+    orderBy: { processStep: { sortOrder: 'asc' as const } },
+  },
+} as const;
 
 @Injectable()
 export class ProductsService {
@@ -19,9 +35,7 @@ export class ProductsService {
   list(keyword?: string, status?: string, processId?: string) {
     return this.prisma.product.findMany({
       where: buildProductFilter(keyword, status, processId),
-      include: {
-        currentProcess: true,
-      },
+      include: productRelations,
       orderBy: [{ createdAt: 'desc' }],
       take: 200,
     });
@@ -36,13 +50,21 @@ export class ProductsService {
           select: { originalName: true },
           orderBy: { createdAt: 'asc' },
         },
+        processOwners: {
+          include: {
+            processStep: true,
+            personnel: true,
+          },
+          orderBy: { processStep: { sortOrder: 'asc' } },
+        },
       },
       orderBy: [{ createdAt: 'desc' }],
     });
     return this.productExportService.createWorkbook(products);
   }
 
-  create(dto: CreateProductDto) {
+  async create(dto: CreateProductDto) {
+    const processOwners = await this.validateProcessOwners(dto.processOwners);
     return this.prisma.product.create({
       data: {
         rowNo: dto.rowNo,
@@ -52,15 +74,18 @@ export class ProductsService {
         quantity: dto.quantity ?? 1,
         unit: normalizeOptionalText(dto.unit) ?? '件',
         remark: normalizeOptionalText(dto.remark),
+        processOwners: {
+          create: processOwners,
+        },
       },
-      include: { currentProcess: true },
+      include: productRelations,
     });
   }
 
   async detail(id: number) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: { currentProcess: true },
+      include: productRelations,
     });
     if (!product) {
       throw new NotFoundException('产品不存在');
@@ -70,10 +95,32 @@ export class ProductsService {
 
   async update(id: number, dto: UpdateProductDto) {
     await this.detail(id);
+    const { processOwners, ...productData } = dto;
+    if (processOwners !== undefined) {
+      const validatedOwners = await this.validateProcessOwners(processOwners);
+      return this.prisma.$transaction(async (tx) => {
+        await tx.productProcessOwner.deleteMany({
+          where: { productId: id },
+        });
+        if (validatedOwners.length > 0) {
+          await tx.productProcessOwner.createMany({
+            data: validatedOwners.map((owner) => ({
+              productId: id,
+              ...owner,
+            })),
+          });
+        }
+        return tx.product.update({
+          where: { id },
+          data: normalizeUpdateProductData(productData),
+          include: productRelations,
+        });
+      });
+    }
     return this.prisma.product.update({
       where: { id },
-      data: normalizeUpdateProductData(dto),
-      include: { currentProcess: true },
+      data: normalizeUpdateProductData(productData),
+      include: productRelations,
     });
   }
 
@@ -108,7 +155,7 @@ export class ProductsService {
           currentEnteredAt: enteredAt,
           status: processStep.name === '完工' ? 'FINISHED' : 'IN_PROGRESS',
         },
-        include: { currentProcess: true },
+        include: productRelations,
       });
     });
   }
@@ -141,6 +188,62 @@ export class ProductsService {
         operator: true,
       },
       orderBy: { scannedAt: 'asc' },
+    });
+  }
+
+  private async validateProcessOwners(assignments: ProductProcessOwnerDto[]) {
+    const requiredProcesses = await this.prisma.processStep.findMany({
+      where: {
+        enabled: true,
+        name: { not: '完工' },
+      },
+      select: { id: true, name: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const assignmentMap = new Map<number, number>();
+    for (const assignment of assignments) {
+      if (assignmentMap.has(assignment.processStepId)) {
+        throw new BadRequestException('同一工序只能指定一名负责人');
+      }
+      assignmentMap.set(assignment.processStepId, assignment.personnelId);
+    }
+
+    for (const processStep of requiredProcesses) {
+      if (!assignmentMap.has(processStep.id)) {
+        throw new BadRequestException(`请指定${processStep.name}工序负责人`);
+      }
+    }
+    if (assignmentMap.size !== requiredProcesses.length) {
+      throw new BadRequestException('负责人分配包含无效或未启用的工序');
+    }
+
+    const personnel = await this.prisma.personnel.findMany({
+      where: { id: { in: [...assignmentMap.values()] } },
+      select: {
+        id: true,
+        name: true,
+        processStepId: true,
+        enabled: true,
+      },
+    });
+    const personnelMap = new Map(personnel.map((item) => [item.id, item]));
+    return requiredProcesses.map((processStep) => {
+      const personnelId = assignmentMap.get(processStep.id)!;
+      const owner = personnelMap.get(personnelId);
+      if (!owner || !owner.enabled) {
+        throw new BadRequestException(
+          `${processStep.name}工序负责人不存在或已停用`,
+        );
+      }
+      if (owner.processStepId !== processStep.id) {
+        throw new BadRequestException(
+          `${owner.name}不属于${processStep.name}工序`,
+        );
+      }
+      return {
+        processStepId: processStep.id,
+        personnelId: owner.id,
+      };
     });
   }
 }
@@ -190,7 +293,9 @@ function buildProductFilter(
   };
 }
 
-function normalizeUpdateProductData(dto: UpdateProductDto) {
+function normalizeUpdateProductData(
+  dto: Omit<UpdateProductDto, 'processOwners'>,
+) {
   const {
     productName,
     productModel,
@@ -202,9 +307,7 @@ function normalizeUpdateProductData(dto: UpdateProductDto) {
 
   return {
     ...unchangedFields,
-    ...(productName !== undefined
-      ? { productName: productName.trim() }
-      : {}),
+    ...(productName !== undefined ? { productName: productName.trim() } : {}),
     ...(productModel !== undefined
       ? { productModel: productModel.trim() }
       : {}),
@@ -214,8 +317,6 @@ function normalizeUpdateProductData(dto: UpdateProductDto) {
     ...(unit !== undefined
       ? { unit: normalizeOptionalText(unit) ?? '件' }
       : {}),
-    ...(remark !== undefined
-      ? { remark: normalizeNullableText(remark) }
-      : {}),
+    ...(remark !== undefined ? { remark: normalizeNullableText(remark) } : {}),
   };
 }

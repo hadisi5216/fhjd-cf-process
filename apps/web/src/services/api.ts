@@ -124,6 +124,7 @@ export type DashboardSummary = {
       serialNo?: string;
       status: Product['status'];
       currentEnteredAt?: string;
+      ownerName?: string | null;
     }>;
   }>;
 };
@@ -145,6 +146,23 @@ export type Product = {
     id: number;
     name: string;
   } | null;
+  processOwners?: ProductProcessOwner[];
+};
+
+export type ProductProcessOwner = {
+  id?: number;
+  processStepId: number;
+  personnelId: number;
+  processStep?: {
+    id: number;
+    name: string;
+    sortOrder: number;
+  };
+  personnel?: {
+    id: number;
+    name: string;
+    enabled: boolean;
+  };
 };
 
 export type FlowRecord = {
@@ -197,6 +215,10 @@ export type ProductInput = {
   quantity?: number;
   unit?: string;
   remark?: string;
+  processOwners: Array<{
+    processStepId: number;
+    personnelId: number;
+  }>;
 };
 
 export type ProcessStep = {
@@ -208,7 +230,28 @@ export type ProcessStep = {
   _count?: {
     scanners: number;
     products: number;
+    personnel: number;
   };
+};
+
+export type Personnel = {
+  id: number;
+  name: string;
+  processStepId: number;
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  processStep: {
+    id: number;
+    name: string;
+    sortOrder: number;
+  };
+};
+
+export type PersonnelInput = {
+  name: string;
+  processStepId: number;
+  enabled?: boolean;
 };
 
 export type ProcessInput = {
@@ -414,6 +457,31 @@ export async function updateProcess(id: number, data: ProcessInput) {
 
 export async function deleteProcess(id: number) {
   const response = await api.delete<{ success: boolean }>(`/processes/${id}`);
+  return response.data;
+}
+
+export async function getPersonnel(processStepId?: number, enabled?: boolean) {
+  const response = await api.get<Personnel[]>('/personnel', {
+    params: {
+      ...(processStepId ? { processStepId } : {}),
+      ...(typeof enabled === 'boolean' ? { enabled } : {}),
+    },
+  });
+  return response.data;
+}
+
+export async function createPersonnel(data: PersonnelInput) {
+  const response = await api.post<Personnel>('/personnel', data);
+  return response.data;
+}
+
+export async function updatePersonnel(id: number, data: PersonnelInput) {
+  const response = await api.put<Personnel>(`/personnel/${id}`, data);
+  return response.data;
+}
+
+export async function deletePersonnel(id: number) {
+  const response = await api.delete<{ success: boolean }>(`/personnel/${id}`);
   return response.data;
 }
 

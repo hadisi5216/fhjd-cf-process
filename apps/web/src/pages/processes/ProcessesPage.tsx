@@ -71,6 +71,7 @@ export function ProcessesPage() {
             { title: '顺序', dataIndex: 'sortOrder', width: 80 },
             { title: '工序名称', dataIndex: 'name' },
             { title: '扫码枪', render: (_, record) => `${record._count?.scanners ?? 0} 台`, width: 100 },
+            { title: '人员', render: (_, record) => `${record._count?.personnel ?? 0} 人`, width: 90 },
             { title: '当前产品', render: (_, record) => `${record._count?.products ?? 0} 件`, width: 110 },
             { title: '超时阈值', dataIndex: 'timeoutHours', render: (value: number) => (value ? `${value} 小时` : '-'), width: 120 },
             { title: '状态', dataIndex: 'enabled', render: (value: boolean) => <Tag color={value ? 'green' : 'default'}>{value ? '启用' : '停用'}</Tag>, width: 90 },

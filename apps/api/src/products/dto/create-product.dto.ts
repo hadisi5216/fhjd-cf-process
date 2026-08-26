@@ -1,10 +1,15 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsInt,
   IsOptional,
   IsPositive,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ProductProcessOwnerDto } from './product-process-owner.dto';
 
 export class CreateProductDto {
   @IsOptional()
@@ -38,4 +43,10 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(500)
   remark?: string | null;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => ProductProcessOwnerDto)
+  processOwners!: ProductProcessOwnerDto[];
 }

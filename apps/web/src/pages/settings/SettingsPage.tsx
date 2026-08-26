@@ -163,7 +163,7 @@ export function SettingsPage() {
               <div className="settings-switch-row settings-font-size-row">
                 <div>
                   <Typography.Text strong>看板列表字号</Typography.Text>
-                  <div className="settings-help-text">调整产品型号和已用时的显示大小。</div>
+                  <div className="settings-help-text">调整产品型号、负责人和已用时的显示大小。</div>
                 </div>
                 <Segmented
                   value={settings?.screenListFontSize ?? 'STANDARD'}

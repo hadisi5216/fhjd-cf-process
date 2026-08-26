@@ -43,23 +43,24 @@ model User {
 }
 
 model Product {
-  id                   Int              @id @default(autoincrement())
-  rowNo                Int?             @map("row_no")
-  productName          String           @map("product_name")
-  productModel         String           @map("product_model")
-  serialNo             String?          @map("serial_no")
-  quantity             Int              @default(1)
-  unit                 String           @default("件")
+  id                   Int                        @id @default(autoincrement())
+  rowNo                Int?                       @map("row_no")
+  productName          String                     @map("product_name")
+  productModel         String                     @map("product_model")
+  serialNo             String?                    @map("serial_no")
+  quantity             Int                        @default(1)
+  unit                 String                     @default("件")
   remark               String?
-  manufacturingProcess String?          @map("manufacturing_process")
-  currentProcessId     Int?             @map("current_process_id")
-  currentEnteredAt     DateTime?        @map("current_entered_at")
-  status               ProductStatus    @default(PENDING)
-  createdAt            DateTime         @default(now()) @map("created_at")
-  updatedAt            DateTime         @updatedAt @map("updated_at")
-  currentProcess       ProcessStep?     @relation(fields: [currentProcessId], references: [id])
+  manufacturingProcess String?                    @map("manufacturing_process")
+  currentProcessId     Int?                       @map("current_process_id")
+  currentEnteredAt     DateTime?                  @map("current_entered_at")
+  status               ProductStatus              @default(PENDING)
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+  currentProcess       ProcessStep?               @relation(fields: [currentProcessId], references: [id])
   drawings             ProductDrawing[]
   processAttachments   ProductProcessAttachment[]
+  processOwners        ProductProcessOwner[]
   flowRecords          FlowRecord[]
   warnings             Warning[]
 
@@ -97,17 +98,49 @@ model ProductProcessAttachment {
 }
 
 model ProcessStep {
-  id           Int          @id @default(autoincrement())
-  name         String       @unique
-  sortOrder    Int          @map("sort_no")
-  timeoutHours Int          @default(72) @map("timeout_hours")
-  enabled      Boolean      @default(true)
-  scanners     Scanner[]
-  products     Product[]
-  flowRecords  FlowRecord[]
-  warnings     Warning[]
+  id            Int                   @id @default(autoincrement())
+  name          String                @unique
+  sortOrder     Int                   @map("sort_no")
+  timeoutHours  Int                   @default(72) @map("timeout_hours")
+  enabled       Boolean               @default(true)
+  scanners      Scanner[]
+  personnel     Personnel[]
+  products      Product[]
+  productOwners ProductProcessOwner[]
+  flowRecords   FlowRecord[]
+  warnings      Warning[]
 
   @@map("process_steps")
+}
+
+model Personnel {
+  id            Int                   @id @default(autoincrement())
+  name          String
+  processStepId Int                   @map("process_step_id")
+  enabled       Boolean               @default(true)
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  processStep   ProcessStep           @relation(fields: [processStepId], references: [id])
+  productOwners ProductProcessOwner[]
+
+  @@index([processStepId, enabled])
+  @@map("personnel")
+}
+
+model ProductProcessOwner {
+  id            Int         @id @default(autoincrement())
+  productId     Int         @map("product_id")
+  processStepId Int         @map("process_step_id")
+  personnelId   Int         @map("personnel_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  processStep   ProcessStep @relation(fields: [processStepId], references: [id])
+  personnel     Personnel   @relation(fields: [personnelId], references: [id])
+
+  @@unique([productId, processStepId])
+  @@index([personnelId])
+  @@map("product_process_owners")
 }
 
 model Scanner {
