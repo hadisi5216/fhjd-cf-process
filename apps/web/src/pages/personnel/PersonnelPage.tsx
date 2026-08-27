@@ -27,6 +27,8 @@ import {
 } from '../../services/api';
 
 export function PersonnelPage() {
+  const [keyword, setKeyword] = useState('');
+  const [processStepId, setProcessStepId] = useState<number>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Personnel | null>(null);
   const [form] = Form.useForm<PersonnelInput>();
@@ -42,6 +44,13 @@ export function PersonnelPage() {
     queryFn: getProcesses,
     retry: false,
   });
+  const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+  const filteredPersonnel = personnel.filter(
+    (person) =>
+      (!normalizedKeyword ||
+        person.name.toLocaleLowerCase().includes(normalizedKeyword)) &&
+      (!processStepId || person.processStepId === processStepId),
+  );
 
   const saveMutation = useMutation({
     mutationFn: (values: PersonnelInput) =>
@@ -109,12 +118,49 @@ export function PersonnelPage() {
       </div>
 
       <Card className="module-card">
+        <div className="table-tools product-filters">
+          <Space wrap>
+            <Input.Search
+              autoComplete="off"
+              allowClear
+              placeholder="搜索人员姓名"
+              value={keyword}
+              style={{ width: 260 }}
+              onChange={(event) => setKeyword(event.target.value)}
+              onSearch={setKeyword}
+            />
+            <Select
+              allowClear
+              placeholder="按工序筛选"
+              value={processStepId}
+              style={{ width: 180 }}
+              options={processes.map((process) => ({
+                label: process.name,
+                value: process.id,
+              }))}
+              onChange={setProcessStepId}
+            />
+            <Button
+              onClick={() => {
+                setKeyword('');
+                setProcessStepId(undefined);
+              }}
+            >
+              重置
+            </Button>
+          </Space>
+        </div>
         <Table
           rowKey="id"
           loading={isLoading}
-          dataSource={personnel}
+          dataSource={filteredPersonnel}
           pagination={false}
-          locale={{ emptyText: '暂无人员，请先新增人员' }}
+          locale={{
+            emptyText:
+              keyword || processStepId
+                ? '暂无符合条件的人员'
+                : '暂无人员，请先新增人员',
+          }}
           columns={[
             { title: '人员姓名', dataIndex: 'name' },
             {
