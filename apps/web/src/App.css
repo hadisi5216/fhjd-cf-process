@@ -1,12 +1,24 @@
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background: #eef2f6;
 }
 
 .app-sider {
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #f7f9fc !important;
   border-right: 1px solid #d9e0ea;
   box-shadow: 8px 0 26px rgba(15, 23, 42, 0.05);
+}
+
+.app-main {
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-logo {
@@ -44,6 +56,7 @@
 }
 
 .app-header {
+  flex: 0 0 68px;
   height: 68px;
   padding: 0 28px;
   display: flex;
@@ -69,7 +82,10 @@
 }
 
 .app-content {
-  min-height: calc(100vh - 68px);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 190px),

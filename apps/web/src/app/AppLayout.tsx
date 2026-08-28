@@ -66,7 +66,7 @@ export function AppLayout() {
           }}
         />
       </Sider>
-      <Layout>
+      <Layout className="app-main">
         <Header className="app-header">
           <Typography.Title level={1} className="app-title">
             产品加工流程管理系统
