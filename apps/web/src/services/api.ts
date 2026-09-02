@@ -121,6 +121,7 @@ export type DashboardSummary = {
       id: number;
       productName: string;
       productModel: string;
+      trackingCode?: string;
       serialNo?: string;
       status: Product['status'];
       currentEnteredAt?: string;
@@ -134,12 +135,13 @@ export type Product = {
   rowNo?: number;
   productName: string;
   productModel: string;
+  trackingCode?: string;
   serialNo?: string;
-  quantity: number;
-  unit: string;
   remark?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
+  status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE' | 'VOIDED';
   currentEnteredAt?: string;
+  voidedAt?: string;
+  voidReason?: string;
   createdAt?: string;
   updatedAt?: string;
   currentProcess?: {
@@ -211,9 +213,8 @@ export type ProductInput = {
   rowNo?: number;
   productName: string;
   productModel: string;
+  trackingCode: string;
   serialNo?: string;
-  quantity?: number;
-  unit?: string;
   remark?: string;
   processOwners: Array<{
     processStepId: number;
@@ -432,6 +433,11 @@ export async function updateProduct(id: number, data: ProductInput) {
 
 export async function updateProductProcess(id: number, processStepId: number) {
   const response = await api.put<Product>(`/products/${id}/process`, { processStepId });
+  return response.data;
+}
+
+export async function voidProduct(id: number, reason: string) {
+  const response = await api.put<Product>(`/products/${id}/void`, { reason });
   return response.data;
 }
 

@@ -9,7 +9,8 @@ type ScreenProduct = {
   id: number;
   productName: string;
   productModel: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE';
+  trackingCode?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'FINISHED' | 'OVERDUE' | 'VOIDED';
   currentEnteredAt?: string;
   ownerName?: string | null;
 };
@@ -103,11 +104,11 @@ function makePreviewProducts(
     'J/CLL9-51-101S1.1',
     'J/CLL9-52A-101S1.1',
     'J/CLL9-53A-101S1.1',
-    'J/CLL9-12A-101S1.1+01',
-    'J/CLL9-12A-101S1.1+02',
-    'J/CLL9-50A-101S1.1+01',
-    'J/CLL9-50A-101S1.1+02',
-    'J/CLL9-52A-101S1.1+01',
+    'J/CLL9-12A-101S1.1',
+    'J/CLL9-12A-101S1.1',
+    'J/CLL9-50A-101S1.1',
+    'J/CLL9-50A-101S1.1',
+    'J/CLL9-52A-101S1.1',
   ];
   const ownerNames = ['张伟', '李强', '王磊', '赵敏'];
 
@@ -115,11 +116,17 @@ function makePreviewProducts(
     Array.from({ length: 40 }, (_, index) => {
       const sequence = index + 1;
       const model = models[index % models.length];
+      const duplicatePosition = index % models.length;
+      const trackingCode =
+        duplicatePosition >= 5
+          ? `${model}-${String((duplicatePosition % 2) + 1).padStart(2, '0')}`
+          : model;
       const elapsedHours = 3 + ((index * 7 + startId) % 86);
       return {
         id: -(startId + sequence),
         productName: model.split('+')[0],
         productModel: model,
+        trackingCode,
         status: elapsedHours >= 72 ? 'OVERDUE' : 'IN_PROGRESS',
         currentEnteredAt: hoursAgo(elapsedHours, referenceTimeMs),
         ownerName: ownerNames[(index + startId) % ownerNames.length],
@@ -376,7 +383,9 @@ export function ScreenPage() {
                           key={product.id}
                           role="row"
                         >
-                          <span role="cell">{product.productModel}</span>
+                          <span role="cell">
+                            {product.trackingCode ?? product.productModel}
+                          </span>
                           <span role="cell">{product.ownerName || '-'}</span>
                           <span role="cell">
                             {elapsedText(

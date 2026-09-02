@@ -15,6 +15,7 @@ enum ProductStatus {
   IN_PROGRESS
   FINISHED
   OVERDUE
+  VOIDED
 }
 
 enum WarningStatus {
@@ -47,6 +48,7 @@ model Product {
   rowNo                Int?                       @map("row_no")
   productName          String                     @map("product_name")
   productModel         String                     @map("product_model")
+  trackingCode         String?                    @unique @map("tracking_code")
   serialNo             String?                    @map("serial_no")
   quantity             Int                        @default(1)
   unit                 String                     @default("件")
@@ -55,6 +57,8 @@ model Product {
   currentProcessId     Int?                       @map("current_process_id")
   currentEnteredAt     DateTime?                  @map("current_entered_at")
   status               ProductStatus              @default(PENDING)
+  voidedAt             DateTime?                  @map("voided_at")
+  voidReason           String?                    @map("void_reason")
   createdAt            DateTime                   @default(now()) @map("created_at")
   updatedAt            DateTime                   @updatedAt @map("updated_at")
   currentProcess       ProcessStep?               @relation(fields: [currentProcessId], references: [id])

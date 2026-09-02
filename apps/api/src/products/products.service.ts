@@ -1,12 +1,15 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
 import { ChangeProductProcessDto } from './dto/change-product-process.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { VoidProductDto } from './dto/void-product.dto';
 import { ProductDrawingsService } from './product-drawings.service';
 import { ProductExportService } from './product-export.service';
 import { ProductProcessAttachmentsService } from './product-process-attachments.service';
@@ -30,6 +33,7 @@ export class ProductsService {
     private readonly productDrawingsService: ProductDrawingsService,
     private readonly productProcessAttachmentsService: ProductProcessAttachmentsService,
     private readonly productExportService: ProductExportService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   list(keyword?: string, status?: string, processId?: string) {
@@ -65,14 +69,18 @@ export class ProductsService {
 
   async create(dto: CreateProductDto) {
     const processOwners = await this.validateProcessOwners(dto.processOwners);
+    const trackingCode = normalizeRequiredText(
+      dto.trackingCode ?? dto.productModel,
+      '流转编号不能为空',
+    );
+    await this.ensureTrackingCodeAvailable(trackingCode);
     return this.prisma.product.create({
       data: {
         rowNo: dto.rowNo,
         productName: dto.productName.trim(),
         productModel: dto.productModel.trim(),
+        trackingCode,
         serialNo: normalizeOptionalText(dto.serialNo),
-        quantity: dto.quantity ?? 1,
-        unit: normalizeOptionalText(dto.unit) ?? '件',
         remark: normalizeOptionalText(dto.remark),
         processOwners: {
           create: processOwners,
@@ -94,8 +102,18 @@ export class ProductsService {
   }
 
   async update(id: number, dto: UpdateProductDto) {
-    await this.detail(id);
+    const product = await this.detail(id);
     const { processOwners, ...productData } = dto;
+    const normalizedProductData = normalizeUpdateProductData(productData);
+    const trackingCode =
+      normalizedProductData.trackingCode ??
+      (!product.trackingCode
+        ? (normalizedProductData.productModel ?? product.productModel)
+        : undefined);
+    if (trackingCode !== undefined) {
+      await this.ensureTrackingCodeAvailable(trackingCode, id);
+      normalizedProductData.trackingCode = trackingCode;
+    }
     if (processOwners !== undefined) {
       const validatedOwners = await this.validateProcessOwners(processOwners);
       return this.prisma.$transaction(async (tx) => {
@@ -112,20 +130,23 @@ export class ProductsService {
         }
         return tx.product.update({
           where: { id },
-          data: normalizeUpdateProductData(productData),
+          data: normalizedProductData,
           include: productRelations,
         });
       });
     }
     return this.prisma.product.update({
       where: { id },
-      data: normalizeUpdateProductData(productData),
+      data: normalizedProductData,
       include: productRelations,
     });
   }
 
   async changeProcess(id: number, dto: ChangeProductProcessDto) {
     const product = await this.detail(id);
+    if (product.status === 'VOIDED') {
+      throw new ConflictException('产品已作废，不能调整工序');
+    }
 
     const processStep = await this.prisma.processStep.findUnique({
       where: { id: dto.processStepId },
@@ -140,7 +161,7 @@ export class ProductsService {
       await tx.flowRecord.create({
         data: {
           productId: product.id,
-          scanContent: product.productModel,
+          scanContent: product.trackingCode ?? product.productModel,
           source: 'MANUAL',
           note: '管理员手动调整工序',
           processStepId: processStep.id,
@@ -160,14 +181,69 @@ export class ProductsService {
     });
   }
 
+  async voidProduct(id: number, dto: VoidProductDto) {
+    const product = await this.detail(id);
+    if (product.status === 'VOIDED') {
+      throw new ConflictException('产品已经作废');
+    }
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('请输入作废原因');
+    }
+    const voidedAt = new Date();
+    const updatedProduct = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${id}, 0)::text`;
+      const currentProduct = await tx.product.findUnique({ where: { id } });
+      if (!currentProduct) {
+        throw new NotFoundException('产品不存在');
+      }
+      if (currentProduct.status === 'VOIDED') {
+        throw new ConflictException('产品已经作废');
+      }
+      await tx.warning.updateMany({
+        where: { productId: id, status: 'OPEN' },
+        data: {
+          status: 'HANDLED',
+          handledAt: voidedAt,
+          handledNote: `产品作废：${reason}`,
+        },
+      });
+      return tx.product.update({
+        where: { id },
+        data: {
+          status: 'VOIDED',
+          voidedAt,
+          voidReason: reason,
+        },
+        include: productRelations,
+      });
+    });
+    this.realtimeService.notifyDashboardUpdate({
+      reason: 'PRODUCT',
+      productId: product.id,
+    });
+    return updatedProduct;
+  }
+
   async remove(id: number) {
     await this.detail(id);
+    const [flowRecordCount, warningCount] = await Promise.all([
+      this.prisma.flowRecord.count({ where: { productId: id } }),
+      this.prisma.warning.count({ where: { productId: id } }),
+    ]);
+    if (flowRecordCount > 0 || warningCount > 0) {
+      throw new ConflictException('该产品已有流转记录或预警记录，不能删除');
+    }
     const [drawingStoredNames, processAttachmentStoredNames] =
       await Promise.all([
         this.productDrawingsService.getStoredNames(id),
         this.productProcessAttachmentsService.getStoredNames(id),
       ]);
     await this.prisma.product.delete({ where: { id } });
+    this.realtimeService.notifyDashboardUpdate({
+      reason: 'PRODUCT',
+      productId: id,
+    });
     await Promise.all([
       this.productDrawingsService
         .removeStoredFiles(drawingStoredNames)
@@ -246,6 +322,25 @@ export class ProductsService {
       };
     });
   }
+
+  private async ensureTrackingCodeAvailable(
+    trackingCode: string,
+    excludedProductId?: number,
+  ) {
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        OR: [
+          { trackingCode },
+          { trackingCode: null, productModel: trackingCode },
+        ],
+        ...(excludedProductId ? { id: { not: excludedProductId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existingProduct) {
+      throw new ConflictException('流转编号已存在，请使用唯一编号');
+    }
+  }
 }
 
 function normalizeOptionalText(value?: string | null) {
@@ -256,6 +351,14 @@ function normalizeOptionalText(value?: string | null) {
 function normalizeNullableText(value?: string | null) {
   const normalized = value?.trim();
   return normalized || null;
+}
+
+function normalizeRequiredText(value: string, message: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new BadRequestException(message);
+  }
+  return normalized;
 }
 
 function buildProductFilter(
@@ -281,6 +384,12 @@ function buildProductFilter(
               },
             },
             {
+              trackingCode: {
+                contains: keyword,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
               serialNo: { contains: keyword, mode: 'insensitive' as const },
             },
           ],
@@ -299,8 +408,8 @@ function normalizeUpdateProductData(
   const {
     productName,
     productModel,
+    trackingCode,
     serialNo,
-    unit,
     remark,
     ...unchangedFields
   } = dto;
@@ -311,11 +420,13 @@ function normalizeUpdateProductData(
     ...(productModel !== undefined
       ? { productModel: productModel.trim() }
       : {}),
+    ...(trackingCode !== undefined
+      ? {
+          trackingCode: normalizeRequiredText(trackingCode, '流转编号不能为空'),
+        }
+      : {}),
     ...(serialNo !== undefined
       ? { serialNo: normalizeNullableText(serialNo) }
-      : {}),
-    ...(unit !== undefined
-      ? { unit: normalizeOptionalText(unit) ?? '件' }
       : {}),
     ...(remark !== undefined ? { remark: normalizeNullableText(remark) } : {}),
   };

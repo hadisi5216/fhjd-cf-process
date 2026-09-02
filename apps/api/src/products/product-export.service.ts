@@ -4,9 +4,8 @@ import ExcelJS from 'exceljs';
 export type ProductExportRow = {
   productName: string;
   productModel: string;
+  trackingCode: string | null;
   serialNo: string | null;
-  quantity: number;
-  unit: string;
   remark: string | null;
   processAttachments: Array<{ originalName: string }>;
   processOwners: Array<{
@@ -25,6 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: '加工中',
   FINISHED: '已完工',
   OVERDUE: '已超时',
+  VOIDED: '已作废',
 };
 
 @Injectable()
@@ -40,9 +40,8 @@ export class ProductExportService {
     worksheet.columns = [
       { header: '产品名称', key: 'productName', width: 22 },
       { header: '产品型号', key: 'productModel', width: 28 },
+      { header: '流转编号', key: 'trackingCode', width: 32 },
       { header: '流水号', key: 'serialNo', width: 16 },
-      { header: '数量', key: 'quantity', width: 10 },
-      { header: '单位', key: 'unit', width: 10 },
       { header: '当前工序', key: 'currentProcess', width: 14 },
       { header: '工序负责人', key: 'processOwners', width: 30 },
       { header: '状态', key: 'status', width: 12 },
@@ -57,9 +56,8 @@ export class ProductExportService {
       products.map((product) => ({
         productName: product.productName,
         productModel: product.productModel,
+        trackingCode: product.trackingCode ?? product.productModel,
         serialNo: product.serialNo ?? '',
-        quantity: product.quantity,
-        unit: product.unit,
         currentProcess: product.currentProcess?.name ?? '待扫码',
         processOwners: product.processOwners
           .map((owner) => `${owner.processStep.name}：${owner.personnel.name}`)
@@ -87,7 +85,7 @@ export class ProductExportService {
 
     worksheet.autoFilter = {
       from: 'A1',
-      to: `M${Math.max(products.length + 1, 1)}`,
+      to: `L${Math.max(products.length + 1, 1)}`,
     };
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;

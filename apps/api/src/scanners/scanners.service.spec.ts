@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { ScannersService } from './scanners.service';
 
 describe('ScannersService', () => {
@@ -12,6 +13,7 @@ describe('ScannersService', () => {
     id: 20,
     productName: '12号导管管体',
     productModel: 'J/CLL9-12A-101S1.1',
+    trackingCode: 'J/CLL9-12A-101S1.1-01',
     status: 'IN_PROGRESS',
     currentProcessId: 11,
     currentEnteredAt: new Date('2026-07-15T01:00:00.000Z'),
@@ -21,11 +23,19 @@ describe('ScannersService', () => {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       flowRecord: {
-        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 30, ...data })),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 30, ...data }),
+          ),
       },
       product: {
         findUnique: jest.fn().mockResolvedValue(currentProduct),
-        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...currentProduct, ...data })),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...currentProduct, ...data }),
+          ),
       },
     };
     const prisma = {
@@ -52,18 +62,30 @@ describe('ScannersService', () => {
   }
 
   it('moves to the scanned process regardless of process order', async () => {
-    const { service, realtime, tx } = createFixture();
+    const { service, prisma, realtime, tx } = createFixture();
 
     const result = await service.recordScan(
       {
         scannerCode: 'DM',
-        content: product.productModel,
+        content: product.trackingCode,
         scanTime: '2026-07-15T02:00:00.000Z',
       },
       '192.168.1.11',
     );
 
     expect(result.duplicated).toBe(false);
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { trackingCode: product.trackingCode },
+          {
+            trackingCode: null,
+            productModel: product.trackingCode,
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
     expect(tx.flowRecord.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ isDuplicate: false }),
     });
@@ -93,7 +115,7 @@ describe('ScannersService', () => {
     const result = await service.recordScan(
       {
         scannerCode: 'DM',
-        content: product.productModel,
+        content: product.trackingCode,
         scanTime: '2026-07-15T03:00:00.000Z',
       },
       '192.168.1.11',
@@ -124,7 +146,7 @@ describe('ScannersService', () => {
     await service.recordScan(
       {
         scannerCode: 'WG',
-        content: product.productModel,
+        content: product.trackingCode,
         scanTime: '2026-07-20T02:00:00.000Z',
       },
       '192.168.1.15',
@@ -155,7 +177,7 @@ describe('ScannersService', () => {
     const result = await service.recordScan(
       {
         scannerCode: 'DM',
-        content: product.productModel,
+        content: product.trackingCode,
         scanTime: '2026-07-20T03:00:00.000Z',
       },
       '192.168.1.11',
@@ -170,5 +192,27 @@ describe('ScannersService', () => {
       }),
     });
     expect(realtime.notifyDashboardUpdate).toHaveBeenCalled();
+  });
+
+  it('rejects scans for voided products', async () => {
+    const voidedProduct = {
+      ...product,
+      status: 'VOIDED',
+    };
+    const { service, realtime, tx } = createFixture(voidedProduct);
+
+    await expect(
+      service.recordScan(
+        {
+          scannerCode: 'DM',
+          content: product.trackingCode,
+        },
+        '192.168.1.11',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(tx.flowRecord.create).not.toHaveBeenCalled();
+    expect(tx.product.update).not.toHaveBeenCalled();
+    expect(realtime.notifyDashboardUpdate).not.toHaveBeenCalled();
   });
 });

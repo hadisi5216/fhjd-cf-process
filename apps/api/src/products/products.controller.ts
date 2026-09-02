@@ -23,6 +23,7 @@ import { ChangeProductProcessDto } from './dto/change-product-process.dto';
 import { ProductDrawingsService } from './product-drawings.service';
 import { ProductProcessAttachmentsService } from './product-process-attachments.service';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { VoidProductDto } from './dto/void-product.dto';
 import { ProductsService } from './products.service';
 
 @UseGuards(JwtAuthGuard)
@@ -75,6 +76,11 @@ export class ProductsController {
   @Put(':id/process')
   changeProcess(@Param('id') id: string, @Body() dto: ChangeProductProcessDto) {
     return this.productsService.changeProcess(Number(id), dto);
+  }
+
+  @Put(':id/void')
+  voidProduct(@Param('id') id: string, @Body() dto: VoidProductDto) {
+    return this.productsService.voidProduct(Number(id), dto);
   }
 
   @Put(':id')
@@ -204,7 +210,6 @@ function formatExportTimestamp() {
 function encodeContentDispositionFilename(value: string) {
   return encodeURIComponent(value).replace(
     /['()*]/g,
-    (character) =>
-      `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 }

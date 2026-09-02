@@ -43,6 +43,11 @@ export function WarningsPage() {
           columns={[
             { title: '产品名称', render: (_, record) => record.product.productName },
             { title: '产品型号', render: (_, record) => record.product.productModel },
+            {
+              title: '流转编号',
+              render: (_, record) =>
+                record.product.trackingCode ?? record.product.productModel,
+            },
             { title: '当前工序', render: (_, record) => record.processStep.name, width: 100 },
             { title: '预警说明', dataIndex: 'message', render: (_: string | undefined, record: Warning) => record.message ?? `${record.product.productName} 超时未流转` },
             { title: '产生时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },

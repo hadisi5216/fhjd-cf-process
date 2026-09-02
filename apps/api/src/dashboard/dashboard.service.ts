@@ -8,7 +8,7 @@ export class DashboardService {
   async summary() {
     const [total, inProgress, finished, overdue, processSteps] =
       await Promise.all([
-        this.prisma.product.count(),
+        this.prisma.product.count({ where: { status: { not: 'VOIDED' } } }),
         this.prisma.product.count({ where: { status: 'IN_PROGRESS' } }),
         this.prisma.product.count({ where: { status: 'FINISHED' } }),
         this.prisma.warning.count({ where: { status: 'OPEN' } }),
@@ -28,6 +28,7 @@ export class DashboardService {
                 id: true,
                 productName: true,
                 productModel: true,
+                trackingCode: true,
                 serialNo: true,
                 status: true,
                 currentEnteredAt: true,

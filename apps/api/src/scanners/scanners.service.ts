@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CreateScannerDto } from './dto/create-scanner.dto';
@@ -54,7 +59,11 @@ export class ScannersService {
     const normalizedSourceIp = normalizeIp(sourceIp);
     const scannerCode = normalizeText(dto.scannerCode);
     const scannerName = normalizeText(dto.scannerName);
-    const scannerOptions = buildScannerMatchOptions(scannerCode, scannerName, normalizedSourceIp);
+    const scannerOptions = buildScannerMatchOptions(
+      scannerCode,
+      scannerName,
+      normalizedSourceIp,
+    );
 
     const scanner = await this.prisma.scanner.findFirst({
       where: {
@@ -95,11 +104,17 @@ export class ScannersService {
       // Serialize every scan for one product so different process guns cannot race each other.
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(${product.id}, 0)::text`;
 
-      const currentProduct = await tx.product.findUnique({ where: { id: product.id } });
+      const currentProduct = await tx.product.findUnique({
+        where: { id: product.id },
+      });
       if (!currentProduct) {
         throw new NotFoundException('产品不存在');
       }
-      const isDuplicate = currentProduct.currentProcessId === scanner.processStepId;
+      if (currentProduct.status === 'VOIDED') {
+        throw new ConflictException('产品已作废，不能扫码流转');
+      }
+      const isDuplicate =
+        currentProduct.currentProcessId === scanner.processStepId;
 
       const flowRecord = await tx.flowRecord.create({
         data: {
@@ -119,7 +134,10 @@ export class ScannersService {
             data: {
               currentProcessId: scanner.processStepId,
               currentEnteredAt: scannedAt,
-              status: scanner.processStep.name === '完工' ? 'FINISHED' : 'IN_PROGRESS',
+              status:
+                scanner.processStep.name === '完工'
+                  ? 'FINISHED'
+                  : 'IN_PROGRESS',
             },
           });
 
@@ -127,7 +145,9 @@ export class ScannersService {
         flowRecord,
         updatedProduct,
         isDuplicate,
-        enteredAt: isDuplicate ? (currentProduct.currentEnteredAt ?? scannedAt) : scannedAt,
+        enteredAt: isDuplicate
+          ? (currentProduct.currentEnteredAt ?? scannedAt)
+          : scannedAt,
       };
     });
 
@@ -164,7 +184,10 @@ export class ScannersService {
   private async findProductByScanContent(scanContent: string) {
     const exactProduct = await this.prisma.product.findFirst({
       where: {
-        productModel: scanContent,
+        OR: [
+          { trackingCode: scanContent },
+          { trackingCode: null, productModel: scanContent },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -178,7 +201,14 @@ export class ScannersService {
       take: 500,
     });
 
-    return candidates.find((candidate) => candidate.productModel.trim() === scanContent) ?? null;
+    return (
+      candidates.find(
+        (candidate) =>
+          candidate.trackingCode?.trim() === scanContent ||
+          (!candidate.trackingCode &&
+            candidate.productModel.trim() === scanContent),
+      ) ?? null
+    );
   }
 }
 
@@ -193,11 +223,17 @@ function normalizeText(value?: string) {
   return normalized || undefined;
 }
 
-function buildScannerMatchOptions(scannerCode?: string, scannerName?: string, fallbackIp?: string) {
+function buildScannerMatchOptions(
+  scannerCode?: string,
+  scannerName?: string,
+  fallbackIp?: string,
+) {
   const aliasOptions = [
     scannerCode ? { code: scannerCode } : undefined,
     scannerCode ? { name: scannerCode } : undefined,
-    scannerName && scannerName !== scannerCode ? { name: scannerName } : undefined,
+    scannerName && scannerName !== scannerCode
+      ? { name: scannerName }
+      : undefined,
   ].filter(Boolean) as Array<{ code?: string; name?: string }>;
 
   if (aliasOptions.length) {

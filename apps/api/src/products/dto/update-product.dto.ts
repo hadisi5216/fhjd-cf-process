@@ -2,7 +2,6 @@ import {
   IsArray,
   IsInt,
   IsOptional,
-  IsPositive,
   IsString,
   MaxLength,
   ValidateNested,
@@ -27,18 +26,13 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(80)
-  serialNo?: string | null;
-
-  @IsOptional()
-  @IsInt()
-  @IsPositive()
-  quantity?: number;
+  @MaxLength(160)
+  trackingCode?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(20)
-  unit?: string | null;
+  @MaxLength(80)
+  serialNo?: string | null;
 
   @IsOptional()
   @IsString()

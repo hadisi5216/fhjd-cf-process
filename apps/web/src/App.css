@@ -939,6 +939,19 @@
   text-align: center;
 }
 
+.product-owner-summary {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.product-owner-summary > span {
+  color: #45546d;
+  white-space: nowrap;
+}
+
 .screen-command-data-row span:last-child {
   padding-left: 0;
   font-variant-numeric: tabular-nums;

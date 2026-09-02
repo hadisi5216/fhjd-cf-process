@@ -9,6 +9,10 @@ export type DashboardUpdatePayload =
     }
   | {
       reason: 'SETTINGS';
+    }
+  | {
+      reason: 'PRODUCT';
+      productId: number;
     };
 
 export type DashboardUpdate = DashboardUpdatePayload & {
@@ -22,6 +26,9 @@ export class RealtimeService {
   readonly dashboardUpdates$ = this.dashboardUpdates.asObservable();
 
   notifyDashboardUpdate(update: DashboardUpdatePayload) {
-    this.dashboardUpdates.next({ ...update, occurredAt: new Date().toISOString() });
+    this.dashboardUpdates.next({
+      ...update,
+      occurredAt: new Date().toISOString(),
+    });
   }
 }

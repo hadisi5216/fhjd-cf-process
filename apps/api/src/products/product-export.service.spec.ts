@@ -8,9 +8,8 @@ describe('ProductExportService', () => {
       {
         productName: '12号舵舱体',
         productModel: 'J/CLL9-12A-101S1.1',
+        trackingCode: 'J/CLL9-12A-101S1.1-01',
         serialNo: '2606003',
-        quantity: 1,
-        unit: '件',
         remark: '重点件',
         processAttachments: [
           { originalName: '装配工艺.docx' },
@@ -37,8 +36,9 @@ describe('ProductExportService', () => {
     expect(worksheet?.rowCount).toBe(2);
     expect(worksheet?.getCell('A2').value).toBe('12号舵舱体');
     expect(worksheet?.getCell('B2').value).toBe('J/CLL9-12A-101S1.1');
-    expect(worksheet?.getCell('G2').value).toBe('打磨：张工');
-    expect(worksheet?.getCell('H2').value).toBe('加工中');
-    expect(worksheet?.getCell('I2').value).toBe('装配工艺.docx\n检验记录.xlsx');
+    expect(worksheet?.getCell('C2').value).toBe('J/CLL9-12A-101S1.1-01');
+    expect(worksheet?.getCell('F2').value).toBe('打磨：张工');
+    expect(worksheet?.getCell('G2').value).toBe('加工中');
+    expect(worksheet?.getCell('H2').value).toBe('装配工艺.docx\n检验记录.xlsx');
   });
 });

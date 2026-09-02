@@ -34,6 +34,9 @@ describe('DashboardService', () => {
       overdue: 2,
       byProcess: [],
     });
+    expect(prisma.product.count).toHaveBeenNthCalledWith(1, {
+      where: { status: { not: 'VOIDED' } },
+    });
   });
 
   it('returns the owner assigned to the product current process', async () => {

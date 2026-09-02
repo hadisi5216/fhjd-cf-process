@@ -60,6 +60,7 @@ function statusText(value?: string) {
     IN_PROGRESS: '加工中',
     FINISHED: '已完工',
     OVERDUE: '已超时',
+    VOIDED: '已作废',
   };
   return value ? (map[value] ?? value) : '-';
 }
@@ -68,6 +69,7 @@ function statusColor(value?: string) {
   if (value === 'OVERDUE') return 'red';
   if (value === 'FINISHED') return 'green';
   if (value === 'IN_PROGRESS') return '#126e78';
+  if (value === 'VOIDED') return 'default';
   return 'default';
 }
 
@@ -154,8 +156,8 @@ export function ProductDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard-products'] });
       await queryClient.invalidateQueries({ queryKey: ['screen-summary'] });
     },
-    onError: () => {
-      message.error('调整失败，请确认工序存在');
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '调整失败，请确认工序存在'));
     },
   });
 
@@ -450,10 +452,16 @@ export function ProductDetailPage() {
             {product.productName}
           </Typography.Title>
           <div className="page-kicker">
-            产品详情 / {product.productModel} / 当前工序：{product.currentProcess?.name ?? '待扫码'}
+            产品详情 / {product.trackingCode ?? product.productModel} / 当前工序：{product.currentProcess?.name ?? '待扫码'}
           </div>
         </div>
-        <Button className="detail-action-primary" type="primary" icon={<SwapOutlined />} onClick={openProcessModal}>
+        <Button
+          className="detail-action-primary"
+          type="primary"
+          icon={<SwapOutlined />}
+          disabled={product.status === 'VOIDED'}
+          onClick={openProcessModal}
+        >
           手动调整工序
         </Button>
       </div>
@@ -462,8 +470,10 @@ export function ProductDetailPage() {
         <Descriptions column={{ xs: 1, md: 2, xl: 3 }} bordered size="middle">
           <Descriptions.Item label="产品名称">{product.productName}</Descriptions.Item>
           <Descriptions.Item label="产品型号">{product.productModel}</Descriptions.Item>
+          <Descriptions.Item label="流转编号">
+            {product.trackingCode ?? product.productModel}
+          </Descriptions.Item>
           <Descriptions.Item label="流水号">{product.serialNo ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="数量">{`${product.quantity} ${product.unit}`}</Descriptions.Item>
           <Descriptions.Item label="当前工序">{product.currentProcess?.name ?? '待扫码'}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <Tag color={statusColor(product.status)}>{statusText(product.status)}</Tag>
@@ -471,6 +481,16 @@ export function ProductDetailPage() {
           <Descriptions.Item label="当前工序进入时间">{formatDateTime(product.currentEnteredAt)}</Descriptions.Item>
           <Descriptions.Item label="录入时间">{formatDateTime(product.createdAt)}</Descriptions.Item>
           <Descriptions.Item label="更新时间">{formatDateTime(product.updatedAt)}</Descriptions.Item>
+          {product.status === 'VOIDED' ? (
+            <>
+              <Descriptions.Item label="作废时间">
+                {formatDateTime(product.voidedAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label="作废原因" span={2}>
+                {product.voidReason || '-'}
+              </Descriptions.Item>
+            </>
+          ) : null}
           <Descriptions.Item label="备注" span={3}>
             {product.remark || '-'}
           </Descriptions.Item>

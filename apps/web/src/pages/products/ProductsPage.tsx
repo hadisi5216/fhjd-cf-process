@@ -1,7 +1,7 @@
 import { CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   createProduct,
@@ -12,6 +12,7 @@ import {
   getProcesses,
   getProducts,
   updateProduct,
+  voidProduct,
   type Product,
   type ProductInput,
 } from '../../services/api';
@@ -20,11 +21,16 @@ type ProductFormValues = Omit<ProductInput, 'processOwners'> & {
   processOwnerIds?: Record<string, number>;
 };
 
+type VoidProductFormValues = {
+  reason: string;
+};
+
 const statusOptions: Array<{ label: string; value: Product['status'] }> = [
   { label: '待扫码', value: 'PENDING' },
   { label: '加工中', value: 'IN_PROGRESS' },
   { label: '已完工', value: 'FINISHED' },
   { label: '已超时', value: 'OVERDUE' },
+  { label: '已作废', value: 'VOIDED' },
 ];
 
 function readStatusParam(value: string | null): Product['status'] | undefined {
@@ -37,6 +43,7 @@ function statusLabel(status: Product['status']) {
     IN_PROGRESS: '加工中',
     FINISHED: '已完工',
     OVERDUE: '已超时',
+    VOIDED: '已作废',
   };
   return map[status];
 }
@@ -45,6 +52,7 @@ function statusColor(status: Product['status']) {
   if (status === 'OVERDUE') return 'red';
   if (status === 'FINISHED') return 'green';
   if (status === 'IN_PROGRESS') return '#126e78';
+  if (status === 'VOIDED') return 'default';
   return 'default';
 }
 
@@ -60,8 +68,12 @@ export function ProductsPage() {
   const [quickCreating, setQuickCreating] = useState(false);
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [voidingProduct, setVoidingProduct] = useState<Product | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [form] = Form.useForm<ProductFormValues>();
+  const [voidForm] = Form.useForm<VoidProductFormValues>();
+  const [modal, modalContextHolder] = Modal.useModal();
+  const previousProductModelRef = useRef('');
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -136,6 +148,43 @@ export function ProductsPage() {
         queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
       ]);
     },
+    onError: (error) => {
+      const errorMessage = getApiErrorMessage(error, '产品删除失败，请稍后重试');
+      if (errorMessage === '该产品已有流转记录或预警记录，不能删除') {
+        modal.warning({
+          title: '无法删除产品',
+          content: errorMessage,
+          okText: '知道了',
+          centered: true,
+        });
+        return;
+      }
+      message.error(errorMessage);
+    },
+  });
+
+  const voidMutation = useMutation({
+    mutationFn: (values: VoidProductFormValues) =>
+      voidProduct(voidingProduct!.id, values.reason),
+    onSuccess: async (voidedProduct) => {
+      message.success('产品已作废');
+      setVoidingProduct(null);
+      voidForm.resetFields();
+      queryClient.setQueryData(
+        ['product-detail', voidedProduct.id],
+        voidedProduct,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['warnings'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-products'] }),
+        queryClient.invalidateQueries({ queryKey: ['screen-summary'] }),
+      ]);
+    },
+    onError: (error) => {
+      message.error(getApiErrorMessage(error, '产品作废失败，请稍后重试'));
+    },
   });
 
   function openCreate() {
@@ -143,7 +192,7 @@ export function ProductsPage() {
     setCopyingFrom(null);
     setQuickCreating(false);
     form.resetFields();
-    form.setFieldsValue({ quantity: 1, unit: '件' });
+    previousProductModelRef.current = '';
     setModalOpen(true);
   }
 
@@ -161,9 +210,13 @@ export function ProductsPage() {
       setEditing(null);
       setQuickCreating(true);
       form.resetFields();
-      form.setFieldsValue(
-        latestProduct ? getProductFormValues(latestProduct) : { quantity: 1, unit: '件' },
-      );
+      const values = latestProduct
+        ? getProductFormValues(latestProduct, true)
+        : undefined;
+      previousProductModelRef.current = values?.productModel ?? '';
+      if (values) {
+        form.setFieldsValue(values);
+      }
       setModalOpen(true);
 
       if (!latestProduct) {
@@ -180,7 +233,10 @@ export function ProductsPage() {
     setEditing(record);
     setCopyingFrom(null);
     setQuickCreating(false);
-    form.setFieldsValue(getProductFormValues(record));
+    form.resetFields();
+    const values = getProductFormValues(record);
+    previousProductModelRef.current = values.productModel;
+    form.setFieldsValue(values);
     setModalOpen(true);
   }
 
@@ -189,12 +245,31 @@ export function ProductsPage() {
     setCopyingFrom(record);
     setQuickCreating(false);
     form.resetFields();
-    form.setFieldsValue(getProductFormValues(record));
+    const values = getProductFormValues(record, true);
+    previousProductModelRef.current = values.productModel;
+    form.setFieldsValue(values);
     setModalOpen(true);
   }
 
   function openDetail(id: number) {
     navigate(`/products/${id}`);
+  }
+
+  function syncTrackingCodeWithProductModel(
+    changedValues: Partial<ProductFormValues>,
+  ) {
+    if (typeof changedValues.productModel !== 'string') return;
+    const nextProductModel = changedValues.productModel;
+    const currentTrackingCode = form.getFieldValue('trackingCode') as
+      | string
+      | undefined;
+    if (
+      !currentTrackingCode?.trim() ||
+      currentTrackingCode === previousProductModelRef.current
+    ) {
+      form.setFieldValue('trackingCode', nextProductModel);
+    }
+    previousProductModelRef.current = nextProductModel;
   }
 
   function clearFilters() {
@@ -237,6 +312,7 @@ export function ProductsPage() {
 
   return (
     <>
+      {modalContextHolder}
       <div className="page-toolbar">
         <div>
           <Typography.Title level={2} className="page-title">
@@ -267,7 +343,7 @@ export function ProductsPage() {
           <Space wrap>
             <Input.Search
               autoComplete="off"
-              placeholder="搜索产品名称 / 型号 / 流水号"
+              placeholder="搜索产品名称 / 型号 / 流转编号 / 流水号"
               allowClear
               value={keyword}
               style={{ width: 300 }}
@@ -297,6 +373,7 @@ export function ProductsPage() {
           rowKey="id"
           loading={isLoading && !data.length}
           dataSource={data}
+          scroll={{ x: 1750 }}
           locale={{ emptyText: '暂无产品数据' }}
           onRow={(record) => ({
             className: 'clickable-table-row',
@@ -318,9 +395,35 @@ export function ProductsPage() {
               ),
             },
             { title: '产品型号', dataIndex: 'productModel' },
+            {
+              title: '流转编号',
+              render: (_, record) =>
+                record.trackingCode ?? record.productModel,
+            },
             { title: '流水号', dataIndex: 'serialNo', width: 130 },
-            { title: '数量', render: (_, record) => `${record.quantity} ${record.unit}`, width: 92 },
-            { title: '当前工序', render: (_, record) => record.currentProcess?.name ?? '待扫码', width: 110 },
+            {
+              title: '当前工序',
+              width: 110,
+              render: (_, record) => record.currentProcess?.name ?? '待扫码',
+            },
+            {
+              title: '工序负责人',
+              width: 520,
+              render: (_, record) => (
+                <div className="product-owner-summary">
+                  {productionProcesses.map((process) => {
+                    const ownerName = record.processOwners?.find(
+                      (owner) => owner.processStepId === process.id,
+                    )?.personnel?.name;
+                    return (
+                      <span key={process.id}>
+                        {process.name}[{ownerName ?? '未分配'}]
+                      </span>
+                    );
+                  })}
+                </div>
+              ),
+            },
             {
               title: '状态',
               dataIndex: 'status',
@@ -329,13 +432,26 @@ export function ProductsPage() {
             },
             {
               title: '操作',
-              width: 220,
+              width: 260,
               render: (_, record) => (
                 <Space onClick={(event) => event.stopPropagation()}>
                   <a onClick={() => openDetail(record.id)}>详情</a>
                   <a onClick={() => openEdit(record)}>编辑</a>
                   <a onClick={() => openCopy(record)}>复制</a>
-                  <Popconfirm title="确认删除该产品？" onConfirm={() => deleteMutation.mutate(record.id)}>
+                  {record.status !== 'VOIDED' ? (
+                    <a
+                      onClick={() => {
+                        voidForm.resetFields();
+                        setVoidingProduct(record);
+                      }}
+                    >
+                      作废
+                    </a>
+                  ) : null}
+                  <Popconfirm
+                    title="确认删除该产品？"
+                    onConfirm={() => deleteMutation.mutate(record.id)}
+                  >
                     <a>删除</a>
                   </Popconfirm>
                 </Space>
@@ -359,26 +475,28 @@ export function ProductsPage() {
         destroyOnHidden
         width={720}
       >
-        <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => saveMutation.mutate(values)}>
+        <Form
+          form={form}
+          layout="vertical"
+          autoComplete="off"
+          onValuesChange={syncTrackingCodeWithProductModel}
+          onFinish={(values) => saveMutation.mutate(values)}
+        >
           <Form.Item name="productName" label="产品名称" rules={[{ required: true, message: '请输入产品名称' }]}>
             <Input autoComplete="off" placeholder="请输入产品名称" />
           </Form.Item>
           <Form.Item name="productModel" label="产品型号" rules={[{ required: true, message: '请输入产品型号' }]}>
             <Input autoComplete="off" placeholder="请输入产品型号" />
           </Form.Item>
+          <Form.Item
+            name="trackingCode"
+            label="流转编号"
+            rules={[{ required: true, whitespace: true, message: '请输入流转编号' }]}
+          >
+            <Input autoComplete="off" placeholder="请输入流转编号" />
+          </Form.Item>
           <Form.Item name="serialNo" label="流水号">
             <Input autoComplete="off" placeholder="请输入流水号" />
-          </Form.Item>
-          <Space style={{ width: '100%' }} align="start">
-            <Form.Item name="quantity" label="数量" style={{ flex: 1 }}>
-              <InputNumber min={1} autoComplete="off" placeholder="请输入数量" style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="unit" label="单位" style={{ flex: 1 }}>
-              <Input autoComplete="off" placeholder="请输入单位" />
-            </Form.Item>
-          </Space>
-          <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={3} autoComplete="off" placeholder="请输入备注" />
           </Form.Item>
           <div className="product-owner-section">
             <Typography.Title level={5}>工序负责人</Typography.Title>
@@ -420,19 +538,73 @@ export function ProductsPage() {
               })}
             </div>
           </div>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} autoComplete="off" placeholder="请输入备注" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="作废产品"
+        open={Boolean(voidingProduct)}
+        okText="确认作废"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        confirmLoading={voidMutation.isPending}
+        onCancel={() => {
+          setVoidingProduct(null);
+          voidForm.resetFields();
+        }}
+        onOk={() => voidForm.submit()}
+        destroyOnHidden
+      >
+        <Form
+          form={voidForm}
+          layout="vertical"
+          onFinish={(values) => voidMutation.mutate(values)}
+        >
+          <Form.Item label="产品">
+            <Input
+              value={
+                voidingProduct
+                  ? `${voidingProduct.productName} / ${voidingProduct.productModel}`
+                  : ''
+              }
+              disabled
+            />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label="作废原因"
+            rules={[
+              { required: true, whitespace: true, message: '请输入作废原因' },
+              { max: 500, message: '作废原因不能超过 500 个字符' },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              maxLength={500}
+              showCount
+              placeholder="请输入作废原因"
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </>
   );
 }
 
-function getProductFormValues(product: Product): ProductFormValues {
+function getProductFormValues(
+  product: Product,
+  resetTrackingCode = false,
+): ProductFormValues {
   return {
     productName: product.productName,
     productModel: product.productModel,
+    trackingCode: resetTrackingCode
+      ? product.productModel
+      : (product.trackingCode ?? product.productModel),
     serialNo: product.serialNo ?? '',
-    quantity: product.quantity,
-    unit: product.unit,
     remark: product.remark ?? '',
     processOwnerIds: Object.fromEntries(
       (product.processOwners ?? []).map((owner) => [

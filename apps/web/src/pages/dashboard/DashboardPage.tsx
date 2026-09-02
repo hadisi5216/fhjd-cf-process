@@ -11,6 +11,7 @@ function statusText(value: string) {
     IN_PROGRESS: '加工中',
     FINISHED: '已完工',
     OVERDUE: '已超时',
+    VOIDED: '已作废',
   };
   return map[value] ?? value;
 }
@@ -19,6 +20,7 @@ function statusColor(value: string) {
   if (value === 'OVERDUE') return 'red';
   if (value === 'PENDING') return 'default';
   if (value === 'FINISHED') return 'green';
+  if (value === 'VOIDED') return 'default';
   return '#126e78';
 }
 
@@ -158,6 +160,11 @@ export function DashboardPage() {
                   ),
                 },
                 { title: '产品型号', dataIndex: 'productModel' },
+                {
+                  title: '流转编号',
+                  render: (_, record) =>
+                    record.trackingCode ?? record.productModel,
+                },
                 {
                   title: '当前工序',
                   width: 110,
