@@ -503,9 +503,9 @@
   --screen-text: #f5faff;
   --screen-text-muted: #9fb8cf;
   --screen-list-font-size: 14px;
-  --screen-owner-column-width: 64px;
-  --screen-time-column-width: 96px;
-  --screen-row-height: 33px;
+  --screen-elapsed-font-size: 12px;
+  --screen-meta-column-width: 84px;
+  --screen-row-height: 40px;
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -524,30 +524,30 @@
 
 .screen-command-page.screen-list-font-small {
   --screen-list-font-size: 12px;
-  --screen-owner-column-width: 56px;
-  --screen-time-column-width: 90px;
-  --screen-row-height: 30px;
+  --screen-elapsed-font-size: 11px;
+  --screen-meta-column-width: 76px;
+  --screen-row-height: 36px;
 }
 
 .screen-command-page.screen-list-font-standard {
   --screen-list-font-size: 14px;
-  --screen-owner-column-width: 64px;
-  --screen-time-column-width: 96px;
-  --screen-row-height: 33px;
+  --screen-elapsed-font-size: 12px;
+  --screen-meta-column-width: 84px;
+  --screen-row-height: 40px;
 }
 
 .screen-command-page.screen-list-font-large {
   --screen-list-font-size: 18px;
-  --screen-owner-column-width: 76px;
-  --screen-time-column-width: 118px;
-  --screen-row-height: 42px;
+  --screen-elapsed-font-size: 14px;
+  --screen-meta-column-width: 96px;
+  --screen-row-height: 48px;
 }
 
 .screen-command-page.screen-list-font-extra-large {
   --screen-list-font-size: 22px;
-  --screen-owner-column-width: 92px;
-  --screen-time-column-width: 132px;
-  --screen-row-height: 50px;
+  --screen-elapsed-font-size: 16px;
+  --screen-meta-column-width: 108px;
+  --screen-row-height: 56px;
 }
 
 .screen-command-top {
@@ -761,12 +761,13 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  grid-template-columns: repeat(var(--screen-process-count, 5), minmax(0, 1fr));
   gap: 14px;
   min-height: 0;
 }
 
 .screen-command-panel {
+  min-width: 0;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -814,6 +815,15 @@
 
 .screen-process-tone-涂装 .screen-command-panel-head {
   background: #128052;
+}
+
+.screen-process-tone-气密 {
+  border-color: #a33d66;
+  background: transparent;
+}
+
+.screen-process-tone-气密 .screen-command-panel-head {
+  background: #a33d66;
 }
 
 .screen-command-panel-head {
@@ -886,8 +896,7 @@
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
-    var(--screen-owner-column-width)
-    var(--screen-time-column-width);
+    var(--screen-meta-column-width);
   height: var(--screen-row-height);
   box-sizing: border-box;
 }
@@ -916,7 +925,7 @@
   transition: none;
 }
 
-.screen-command-data-row span {
+.screen-command-data-row > [role='cell'] {
   display: grid;
   place-items: center;
   min-width: 0;
@@ -929,8 +938,9 @@
   white-space: nowrap;
 }
 
-.screen-command-data-row span:first-child {
+.screen-command-data-row > span:first-child {
   overflow: hidden;
+  color: #ffffff;
   text-overflow: ellipsis;
 }
 
@@ -941,10 +951,11 @@
 
 .product-owner-summary {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 16px;
+  flex-wrap: wrap;
+  column-gap: 16px;
+  row-gap: 4px;
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .product-owner-summary > span {
@@ -952,12 +963,28 @@
   white-space: nowrap;
 }
 
-.screen-command-data-row span:last-child {
-  padding-left: 0;
+.screen-command-data-row > .screen-command-product-meta {
+  align-content: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.screen-command-product-owner {
+  max-width: 100%;
+  overflow: hidden;
+  color: #ffffff;
+  text-overflow: ellipsis;
+}
+
+.screen-command-product-elapsed {
+  color: #ffffff;
+  font-size: var(--screen-elapsed-font-size);
   font-variant-numeric: tabular-nums;
 }
 
-.screen-command-data-row.is-alert span {
+.screen-command-data-row.is-alert > span,
+.screen-command-data-row.is-alert .screen-command-product-owner,
+.screen-command-data-row.is-alert .screen-command-product-elapsed {
   color: var(--screen-row-alert);
   font-weight: 400;
 }

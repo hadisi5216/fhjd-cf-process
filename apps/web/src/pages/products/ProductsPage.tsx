@@ -373,7 +373,7 @@ export function ProductsPage() {
           rowKey="id"
           loading={isLoading && !data.length}
           dataSource={data}
-          scroll={{ x: 1750 }}
+          scroll={{ x: 1500 }}
           locale={{ emptyText: '暂无产品数据' }}
           onRow={(record) => ({
             className: 'clickable-table-row',
@@ -383,6 +383,7 @@ export function ProductsPage() {
             {
               title: '产品名称',
               dataIndex: 'productName',
+              width: 180,
               render: (value: string, record) => (
                 <a
                   onClick={(event) => {
@@ -394,13 +395,13 @@ export function ProductsPage() {
                 </a>
               ),
             },
-            { title: '产品型号', dataIndex: 'productModel' },
+            { title: '产品型号', dataIndex: 'productModel', width: 190 },
             {
               title: '流转编号',
+              width: 210,
               render: (_, record) =>
                 record.trackingCode ?? record.productModel,
             },
-            { title: '流水号', dataIndex: 'serialNo', width: 130 },
             {
               title: '当前工序',
               width: 110,
@@ -408,7 +409,6 @@ export function ProductsPage() {
             },
             {
               title: '工序负责人',
-              width: 520,
               render: (_, record) => (
                 <div className="product-owner-summary">
                   {productionProcesses.map((process) => {

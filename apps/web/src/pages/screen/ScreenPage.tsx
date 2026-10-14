@@ -1,6 +1,6 @@
 import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getDashboardSummary, getPublicSettings } from '../../services/api';
 import { getApiDateTime } from '../../utils/datetime';
 import { enterFullscreen } from '../../utils/fullscreen';
@@ -18,7 +18,7 @@ type ScreenProduct = {
 const ROW_STEP_INTERVAL_MS = 2000;
 const END_HOLD_STEPS = 1;
 const SCREEN_REFRESH_INTERVAL_MS = 5000;
-const SCREEN_PROCESS_ORDER = ['打磨', '装配', '包覆', '涂装'];
+const SCREEN_PROCESS_ORDER = ['打磨', '装配', '气密', '包覆', '涂装'];
 const SCREEN_PROCESS_NAMES: Record<string, string> = {
   喷漆: '涂装',
 };
@@ -29,10 +29,10 @@ const SCREEN_LIST_FONT_SIZE_CLASSES = {
   EXTRA_LARGE: 'screen-list-font-extra-large',
 } as const;
 const SCREEN_LIST_ROW_HEIGHTS = {
-  SMALL: 30,
-  STANDARD: 33,
-  LARGE: 42,
-  EXTRA_LARGE: 50,
+  SMALL: 36,
+  STANDARD: 40,
+  LARGE: 48,
+  EXTRA_LARGE: 56,
 } as const;
 
 const SERVER_CLOCK_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
@@ -73,8 +73,8 @@ function elapsedText(value: string | undefined, serverNowMs: number) {
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
 
-  if (days > 0) return `${days}天${hours}小时`;
-  if (hours > 0) return `${hours}小时${minutes}分`;
+  if (days > 0) return `${days}天${hours}时`;
+  if (hours > 0) return `${hours}时${minutes}分`;
   return `${minutes}分钟`;
 }
 
@@ -110,7 +110,7 @@ function makePreviewProducts(
     'J/CLL9-50A-101S1.1',
     'J/CLL9-52A-101S1.1',
   ];
-  const ownerNames = ['张伟', '李强', '王磊', '赵敏'];
+  const ownerNames = ['张伟', '李建国', '王磊', '赵晓峰', '刘志远', '陈敏', '周海涛', '吴强'];
 
   return sortByElapsedDesc(
     Array.from({ length: 40 }, (_, index) => {
@@ -245,6 +245,7 @@ export function ScreenPage() {
     装配: makePreviewProducts(2000, serverNowMs),
     包覆: makePreviewProducts(4000, serverNowMs),
     涂装: makePreviewProducts(3000, serverNowMs),
+    气密: makePreviewProducts(5000, serverNowMs),
   };
   const lastServerSyncMs =
     getApiDateTime(data?.serverTime) ?? serverNowMs;
@@ -287,6 +288,7 @@ export function ScreenPage() {
   return (
     <main
       className={`screen-command-page ${SCREEN_LIST_FONT_SIZE_CLASSES[screenListFontSize]}`}
+      style={{ '--screen-process-count': Math.max(1, displayStats.length) } as CSSProperties}
     >
       <header className="screen-command-top">
         <div className="screen-command-title-block">
@@ -359,7 +361,6 @@ export function ScreenPage() {
                       <div className="screen-command-grid-row" key={index}>
                         <span />
                         <span />
-                        <span />
                       </div>
                     ))}
                   </div>
@@ -386,13 +387,17 @@ export function ScreenPage() {
                           <span role="cell">
                             {product.trackingCode ?? product.productModel}
                           </span>
-                          <span role="cell">{product.ownerName || '-'}</span>
-                          <span role="cell">
-                            {elapsedText(
-                              product.currentEnteredAt,
-                              serverNowMs,
-                            )}
-                          </span>
+                          <div role="cell" className="screen-command-product-meta">
+                            <span className="screen-command-product-owner">
+                              {product.ownerName || '-'}
+                            </span>
+                            <span className="screen-command-product-elapsed">
+                              {elapsedText(
+                                product.currentEnteredAt,
+                                serverNowMs,
+                              )}
+                            </span>
+                          </div>
                         </div>
                       );
                     })}

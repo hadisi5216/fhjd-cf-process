@@ -5,6 +5,9 @@ coverage/
 .env.local
 *.log
 *.tsbuildinfo
+.tmp/
+tmp/
+logs/
 apps/*/dist/
 apps/*/node_modules/
 packages/*/dist/

@@ -1,4 +1,4 @@
-export const PROCESS_STEPS = ["打磨", "装配", "喷漆", "包覆", "完工"] as const;
+export const PROCESS_STEPS = ["打磨", "装配", "喷漆", "包覆", "气密", "完工"] as const;
 
 export const USER_ROLES = ["ADMIN", "PROCESS_OWNER"] as const;
 

@@ -34,6 +34,7 @@ async function main() {
     { name: '装配', timeoutHours: 72 },
     { name: '喷漆', timeoutHours: 72 },
     { name: '包覆', timeoutHours: 72 },
+    { name: '气密', timeoutHours: 72 },
     { name: '完工', timeoutHours: 0 },
   ];
 
